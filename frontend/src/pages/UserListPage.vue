@@ -8,15 +8,24 @@
     <!-- 搜索栏与操作按钮 -->
     <el-card class="search-card">
       <div class="toolbar">
-        <el-input
-          v-model="keyword"
-          placeholder="搜索用户名、姓名、邮箱、手机号..."
-          prefix-icon="Search"
-          clearable
-          style="width: 320px"
-          @keyup.enter="fetchUsers"
-          @clear="fetchUsers"
-        />
+        <div class="search-input-wrapper">
+          <el-input
+            v-model="keyword"
+            placeholder="搜索用户名、姓名、邮箱、手机号..."
+            prefix-icon="Search"
+            clearable
+            style="width: 320px"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
+          />
+          <el-button
+            type="primary"
+            icon="Search"
+            @click="handleSearch"
+          >
+            搜索
+          </el-button>
+        </div>
         <el-button
           type="primary"
           icon="Plus"
@@ -161,6 +170,12 @@ const fetchUsers = async () => {
   }
 }
 
+/** 搜索按钮点击 - 重置页码并查询 */
+const handleSearch = () => {
+  pagination.current = 1
+  fetchUsers()
+}
+
 /** 点击行查看详情 */
 const handleRowClick = (row: any) => {
   selectedUserId.value = row.id
@@ -223,6 +238,11 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.search-input-wrapper {
+  display: flex;
+  gap: 8px;
 }
 
 .table-card {

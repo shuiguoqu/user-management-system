@@ -32,4 +32,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     public List<Order> listByUserId(Long userId) {
         return baseMapper.selectByUserId(userId);
     }
+
+    @Override
+    public void removeByUserId(Long userId) {
+        baseMapper.deleteByUserId(userId);
+    }
 }

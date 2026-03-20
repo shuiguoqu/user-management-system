@@ -10,7 +10,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Validated
 public class UserController {
 
     private final UserService userService;
@@ -32,8 +35,8 @@ public class UserController {
     @Operation(summary = "分页查询用户列表")
     @GetMapping
     public Result<Page<User>> list(
-            @Parameter(description = "当前页码") @RequestParam(defaultValue = "1") int current,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "当前页码") @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") int current,
+            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数必须大于0") int size,
             @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword) {
         return Result.success(userService.pageUsers(current, size, keyword));
     }
@@ -66,10 +69,10 @@ public class UserController {
         return Result.success("更新成功", user);
     }
 
-    @Operation(summary = "删除用户（逻辑删除）")
+    @Operation(summary = "删除用户（级联删除关联订单）")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        boolean removed = userService.removeById(id);
+        boolean removed = userService.removeUserWithOrders(id);
         if (!removed) {
             return Result.error(404, "用户不存在");
         }

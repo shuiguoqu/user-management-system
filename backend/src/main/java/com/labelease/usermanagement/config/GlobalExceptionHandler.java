@@ -1,6 +1,7 @@
 package com.labelease.usermanagement.config;
 
 import com.labelease.usermanagement.common.Result;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,11 +14,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** 参数校验异常 */
+    /** 参数校验异常（@RequestBody） */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<?> handleValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
+                .reduce((a, b) -> a + "; " + b)
+                .orElse("参数校验失败");
+        log.warn("参数校验失败: {}", message);
+        return Result.badRequest(message);
+    }
+
+    /** 参数校验异常（@RequestParam） */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public Result<?> handleConstraintViolation(ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("参数校验失败");
         log.warn("参数校验失败: {}", message);
