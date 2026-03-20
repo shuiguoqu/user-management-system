@@ -122,15 +122,25 @@ const form = reactive({
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 50, message: '用户名长度 3-50 个字符', trigger: 'blur' }
+    { min: 3, max: 50, message: '用户名长度 3-50 个字符', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码不少于 6 个字符', trigger: 'blur' }
+    { min: 6, max: 20, message: '密码长度 6-20 个字符', trigger: 'blur' }
   ],
-  realName: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
-  email: [{ type: 'email' as const, message: '请输入正确的邮箱格式', trigger: 'blur' }],
-  phone: [{ pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }]
+  realName: [
+    { required: true, message: '请输入真实姓名', trigger: 'blur' },
+    { min: 2, max: 20, message: '姓名长度 2-20 个字符', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email' as const, message: '请输入正确的邮箱格式', trigger: 'blur' }
+  ],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号格式', trigger: 'blur' }
+  ]
 }
 
 /** 编辑模式加载用户数据 */
