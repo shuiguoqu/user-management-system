@@ -14,8 +14,8 @@
           prefix-icon="Search"
           clearable
           style="width: 320px"
-          @keyup.enter="fetchUsers"
-          @clear="fetchUsers"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
         />
         <el-button
           type="primary"
@@ -142,6 +142,12 @@ const pagination = reactive({
   size: 10,
   total: 0
 })
+
+/** 搜索处理 - 重置到第一页 */
+const handleSearch = () => {
+  pagination.current = 1
+  fetchUsers()
+}
 
 /** 获取用户列表 */
 const fetchUsers = async () => {

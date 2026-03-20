@@ -20,6 +20,9 @@ service.interceptors.request.use(
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    } else {
+      // 清除可能存在的旧 Authorization 头
+      delete config.headers.Authorization
     }
     return config
   },

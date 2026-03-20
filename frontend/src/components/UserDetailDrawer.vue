@@ -125,12 +125,13 @@ const orderStatusType = (status: number) => {
   return map[status] || 'info'
 }
 
-/** 监听 userId 变化加载数据 */
-watch(() => props.userId, async (newId) => {
-  if (newId && props.modelValue) {
+/** 监听 userId 和 modelValue 变化加载数据 */
+watch([() => props.userId, () => props.modelValue], async ([newId, visible]) => {
+  if (newId && visible) {
     loading.value = true
+    userData.value = null
     try {
-      const res: any = await getUserWithOrders(newId)
+      const res: any = await getUserWithOrders(newId as number)
       userData.value = res.data
     } catch {
       userData.value = null

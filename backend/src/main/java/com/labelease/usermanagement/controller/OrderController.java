@@ -30,6 +30,16 @@ public class OrderController {
             @Parameter(description = "当前页码") @RequestParam(defaultValue = "1") int current,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword) {
+        // 参数校验
+        if (current < 1) {
+            return Result.error(400, "页码不能小于1");
+        }
+        if (size < 1) {
+            return Result.error(400, "每页条数不能小于1");
+        }
+        if (size > 100) {
+            return Result.error(400, "每页条数不能超过100");
+        }
         return Result.success(orderService.pageOrders(current, size, keyword));
     }
 
