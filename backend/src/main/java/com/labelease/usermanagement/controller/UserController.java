@@ -35,6 +35,17 @@ public class UserController {
             @Parameter(description = "当前页码") @RequestParam(defaultValue = "1") int current,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword) {
+        // 参数校验：页码和每页条数不能小于1
+        if (current < 1) {
+            current = 1;
+        }
+        if (size < 1) {
+            size = 10;
+        }
+        // 限制最大每页条数，防止查询过多数据
+        if (size > 100) {
+            size = 100;
+        }
         return Result.success(userService.pageUsers(current, size, keyword));
     }
 
@@ -69,10 +80,15 @@ public class UserController {
     @Operation(summary = "删除用户（逻辑删除）")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        boolean removed = userService.removeById(id);
-        if (!removed) {
+        // 先检查用户是否存在
+        User user = userService.getById(id);
+        if (user == null) {
             return Result.error(404, "用户不存在");
         }
+        // 先逻辑删除该用户的所有订单
+        orderService.removeByUserId(id);
+        // 再逻辑删除用户
+        userService.removeById(id);
         return Result.success("删除成功", null);
     }
 

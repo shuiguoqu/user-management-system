@@ -1,6 +1,7 @@
 package com.labelease.usermanagement.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.labelease.usermanagement.entity.Order;
@@ -31,5 +32,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Override
     public List<Order> listByUserId(Long userId) {
         return baseMapper.selectByUserId(userId);
+    }
+
+    @Override
+    public void removeByUserId(Long userId) {
+        // 逻辑删除该用户下的所有订单
+        LambdaUpdateWrapper<Order> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(Order::getUserId, userId)
+               .set(Order::getDeleted, 1);
+        update(wrapper);
     }
 }

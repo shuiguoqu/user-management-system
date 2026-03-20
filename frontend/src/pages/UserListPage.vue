@@ -124,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUsers, deleteUser } from '@/api/user'
@@ -187,6 +187,12 @@ const handleDelete = async (row: any) => {
     // 用户取消操作
   }
 }
+
+/** 监听关键词变化，重置页码并搜索 */
+watch(keyword, () => {
+  pagination.current = 1
+  fetchUsers()
+})
 
 onMounted(() => {
   fetchUsers()

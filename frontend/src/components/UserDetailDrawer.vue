@@ -125,9 +125,9 @@ const orderStatusType = (status: number) => {
   return map[status] || 'info'
 }
 
-/** 监听 userId 变化加载数据 */
-watch(() => props.userId, async (newId) => {
-  if (newId && props.modelValue) {
+/** 监听 userId 或 drawer 状态变化加载数据 */
+watch([() => props.userId, () => props.modelValue], async ([newId, isOpen]) => {
+  if (newId && isOpen) {
     loading.value = true
     try {
       const res: any = await getUserWithOrders(newId)
