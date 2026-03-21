@@ -1,0 +1,1062 @@
+﻿diff --git a/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java b/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java
+new file mode 100644
+index 0000000..6d524fa
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java
+@@ -0,0 +1,78 @@
++package com.labelease.usermanagement.controller;
++
++import com.labelease.usermanagement.common.Result;
++import com.labelease.usermanagement.mapper.OrderMapper;
++import com.labelease.usermanagement.mapper.UserMapper;
++import io.swagger.v3.oas.annotations.Operation;
++import io.swagger.v3.oas.annotations.tags.Tag;
++import lombok.RequiredArgsConstructor;
++import org.apache.ibatis.annotations.Param;
++import org.apache.ibatis.annotations.Select;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
++
++import java.math.BigDecimal;
++import java.time.LocalDate;
++import java.time.format.DateTimeFormatter;
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++/**
++ * 鏁版嵁缁熻鎺у埗鍣?- 浠〃鐩樻暟鎹帴鍙?+ */
++@Tag(name = "鏁版嵁缁熻", description = "浠〃鐩樼粺璁℃暟鎹帴鍙?)
++@RestController
++@RequestMapping("/api/statistics")
++@RequiredArgsConstructor
++public class StatisticsController {
++
++    private final UserMapper userMapper;
++    private final OrderMapper orderMapper;
++
++    @Operation(summary = "鑾峰彇浠〃鐩樼粺璁℃暟鎹?)
++    @GetMapping("/dashboard")
++    public Result<Map<String, Object>> getDashboardStatistics() {
++        Map<String, Object> data = new HashMap<>();
++
++        Long totalUsers = userMapper.selectCount(null);
++        data.put("totalUsers", totalUsers);
++
++        Long monthNewUsers = userMapper.countNewUsersThisMonth();
++        data.put("monthNewUsers", monthNewUsers);
++
++        Long totalOrders = orderMapper.selectCount(null);
++        data.put("totalOrders", totalOrders);
++
++        BigDecimal totalAmount = orderMapper.sumAllAmount();
++        data.put("totalAmount", totalAmount != null ? totalAmount : BigDecimal.ZERO);
++
++        return Result.success(data);
++    }
++
++    @Operation(summary = "鑾峰彇鏈€杩?澶╄秼鍔挎暟鎹?)
++    @GetMapping("/trend")
++    public Result<List<Map<String, Object>>> getTrendData() {
++        List<Map<String, Object>> trendList = new ArrayList<>();
++        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
++
++        for (int i = 6; i >= 0; i--) {
++            LocalDate date = LocalDate.now().minusDays(i);
++            String dateStr = date.format(formatter);
++
++            Long newUsers = userMapper.countNewUsersByDate(date);
++            Long newOrders = orderMapper.countNewOrdersByDate(date);
++
++            Map<String, Object> dayData = new HashMap<>();
++            dayData.put("date", dateStr);
++            dayData.put("newUsers", newUsers);
++            dayData.put("newOrders", newOrders);
++
++            trendList.add(dayData);
++        }
++
++        return Result.success(trendList);
++    }
++}
+diff --git a/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java b/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java
+index 7fe0bb5..21c39e6 100644
+--- a/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java
++++ b/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java
+@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
+ import org.apache.ibatis.annotations.Param;
+ import org.apache.ibatis.annotations.Select;
+ 
++import java.math.BigDecimal;
++import java.time.LocalDate;
+ import java.util.List;
+ 
+ /**
+@@ -17,4 +19,12 @@ public interface OrderMapper extends BaseMapper<Order> {
+     /** 鏍规嵁鐢ㄦ埛ID鏌ヨ璇ョ敤鎴风殑鎵€鏈夎鍗?*/
+     @Select("SELECT * FROM t_order WHERE user_id = #{userId} AND deleted = 0 ORDER BY create_time DESC")
+     List<Order> selectByUserId(@Param("userId") Long userId);
++
++    /** 缁熻鎵€鏈夎鍗曟€婚噾棰?*/
++    @Select("SELECT COALESCE(SUM(amount), 0) FROM t_order WHERE deleted = 0")
++    BigDecimal sumAllAmount();
++
++    /** 缁熻鎸囧畾鏃ユ湡鏂板璁㈠崟鏁?*/
++    @Select("SELECT COUNT(*) FROM t_order WHERE deleted = 0 AND DATE(create_time) = #{date}")
++    Long countNewOrdersByDate(@Param("date") LocalDate date);
+ }
+diff --git a/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java b/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java
+index bd303c0..fc9a1f7 100644
+--- a/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java
++++ b/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java
+@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
+ import org.apache.ibatis.annotations.Param;
+ import org.apache.ibatis.annotations.Select;
+ 
++import java.time.LocalDate;
++
+ /**
+  * 鐢ㄦ埛鏁版嵁璁块棶灞?  */
+@@ -15,4 +17,12 @@ public interface UserMapper extends BaseMapper<User> {
+     /** 鏍规嵁鐢ㄦ埛鍚嶆煡璇紙鍚瘑鐮侊紝鐢ㄤ簬鐧诲綍锛?*/
+     @Select("SELECT * FROM t_user WHERE username = #{username} AND deleted = 0")
+     User selectByUsername(@Param("username") String username);
++
++    /** 缁熻鏈湀鏂板鐢ㄦ埛鏁?*/
++    @Select("SELECT COUNT(*) FROM t_user WHERE deleted = 0 AND DATE_FORMAT(create_time, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')")
++    Long countNewUsersThisMonth();
++
++    /** 缁熻鎸囧畾鏃ユ湡鏂板鐢ㄦ埛鏁?*/
++    @Select("SELECT COUNT(*) FROM t_user WHERE deleted = 0 AND DATE(create_time) = #{date}")
++    Long countNewUsersByDate(@Param("date") LocalDate date);
+ }
+diff --git a/backend/src/main/resources/db/init.sql b/backend/src/main/resources/db/init.sql
+index 98d3229..ce6cc02 100644
+--- a/backend/src/main/resources/db/init.sql
++++ b/backend/src/main/resources/db/init.sql
+@@ -69,3 +69,61 @@ INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`
+ ('ORD20260009', 5, '渚挎惡寮忓挅鍟＄爺纾ㄥ櫒',      329.00, 0),
+ ('ORD20260010', 1, '澶╃劧涔宠兌鏋曞ご',         268.00, 2)
+ ON DUPLICATE KEY UPDATE `order_no` = VALUES(`order_no`);
++
++-- ============================================================
++-- 浠〃鐩樻祴璇曟暟鎹?- 鏈€杩?澶╃殑鐢ㄦ埛鍜岃鍗曟暟鎹?+-- ============================================================
++
++-- 娓呯悊鏃х殑娴嬭瘯鏁版嵁锛堜繚鐣欏師濮?涓敤鎴峰拰10涓鍗曪級
++DELETE FROM `t_order` WHERE `id` > 10;
++DELETE FROM `t_user` WHERE `id` > 5;
++
++-- 娣诲姞鏈€杩?澶╃殑娴嬭瘯鐢ㄦ埛锛堟瘡澶?-3涓柊鐢ㄦ埛锛?+INSERT INTO `t_user` (`id`, `username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++(6,  'testuser1',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛1',  'test1@example.com',  '13900000001', 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++(7,  'testuser2',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛2',  'test2@example.com',  '13900000002', 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++(8,  'testuser3',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛3',  'test3@example.com',  '13900000003', 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++(9,  'testuser4',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛4',  'test4@example.com',  '13900000004', 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++(10, 'testuser5',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛5',  'test5@example.com',  '13900000005', 1, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++(11, 'testuser6',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛6',  'test6@example.com',  '13900000006', 1, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++(12, 'testuser7',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛7',  'test7@example.com',  '13900000007', 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++(13, 'testuser8',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛8',  'test8@example.com',  '13900000008', 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++(14, 'testuser9',  '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛9',  'test9@example.com',  '13900000009', 1, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++(15, 'testuser10', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛10', 'test10@example.com', '13900000010', 1, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++(16, 'testuser11', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛11', 'test11@example.com', '13900000011', 1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++(17, 'testuser12', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛12', 'test12@example.com', '13900000012', 1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++(18, 'testuser13', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛13', 'test13@example.com', '13900000013', 1, DATE_SUB(CURDATE(), INTERVAL 0 DAY)),
++(19, 'testuser14', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛14', 'test14@example.com', '13900000014', 1, DATE_SUB(CURDATE(), INTERVAL 0 DAY)),
++(20, 'testuser15', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛15', 'test15@example.com', '13900000015', 1, DATE_SUB(CURDATE(), INTERVAL 0 DAY))
++ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
++
++-- 娣诲姞鏈€杩?澶╃殑娴嬭瘯璁㈠崟锛堟瘡澶?-5涓柊璁㈠崟锛?+INSERT INTO `t_order` (`id`, `order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++(11, 'ORD20260011', 1, '鏅鸿兘鎵嬬幆Pro',        299.00,  1, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++(12, 'ORD20260012', 2, '鏈烘閿洏闈掕酱',       459.00,  2, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++(13, 'ORD20260013', 3, '鏄剧ず鍣ㄦ敮鏋?,         189.00,  3, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++(14, 'ORD20260014', 1, 'Type-C鎵╁睍鍧?,       159.00,  1, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++(15, 'ORD20260015', 2, '鏃犵嚎榧犳爣',           89.00,   2, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++(16, 'ORD20260016', 3, '绗旇鏈敮鏋堕摑鍚堥噾',    129.00,  3, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++(17, 'ORD20260017', 4, 'USB-C鏁版嵁绾垮瑁?,    49.00,   1, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++(18, 'ORD20260018', 1, '妗岄潰鏀剁撼鐩?,         39.90,   2, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++(19, 'ORD20260019', 2, '鎵嬫満蹇厖澶?,         79.00,   3, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++(20, 'ORD20260020', 3, '钃濈墮鑰虫満',          199.00,  1, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++(21, 'ORD20260021', 4, '鎶ょ溂鍙扮伅',          249.00,  2, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++(22, 'ORD20260022', 1, '淇濇俯鏉?,            69.00,   3, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++(23, 'ORD20260023', 2, '鎶辨灂闈犲灚',          35.00,   1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++(24, 'ORD20260024', 3, '妗岄潰缁挎',          25.00,   2, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++(25, 'ORD20260025', 4, '榧犳爣鍨ぇ鍙?,        19.90,   3, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++(26, 'ORD20260026', 1, '鎵嬫満鏀灦',          15.00,   1, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++(27, 'ORD20260027', 2, '鏁版嵁绾挎敹绾冲寘',      29.00,   2, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++(28, 'ORD20260028', 3, '灞忓箷娓呮磥濂楄',      18.50,   3, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++(29, 'ORD20260029', 4, '渚跨绾?,            9.90,    1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++(30, 'ORD20260030', 1, '绛惧瓧绗斿瑁?,        22.00,   2, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++(31, 'ORD20260031', 2, '鏂囦欢澶?,            12.00,   3, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++(32, 'ORD20260032', 3, '璁＄畻鍣?,            45.00,   1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++(33, 'ORD20260033', 4, '璁功鏈?,            16.00,   2, DATE_SUB(CURDATE(), INTERVAL 0 DAY)),
++(34, 'ORD20260034', 1, '鍓垁',              8.50,    3, DATE_SUB(CURDATE(), INTERVAL 0 DAY)),
++(35, 'ORD20260035', 2, '鑳跺甫',              5.00,    1, DATE_SUB(CURDATE(), INTERVAL 0 DAY)),
++(36, 'ORD20260036', 3, '鍥炲舰閽?,            3.00,    2, DATE_SUB(CURDATE(), INTERVAL 0 DAY)),
++(37, 'ORD20260037', 4, '渚垮埄璐?,            6.50,    3, DATE_SUB(CURDATE(), INTERVAL 0 DAY))
++ON DUPLICATE KEY UPDATE `order_no` = VALUES(`order_no`);
+diff --git a/frontend/package.json b/frontend/package.json
+index ce4ca50..6be080c 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -11,21 +11,22 @@
+     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+   },
+   "dependencies": {
+-    "vue": "^3.4.21",
+-    "vue-router": "^4.3.0",
+-    "element-plus": "^2.7.2",
+-    "axios": "^1.6.8",
+     "@element-plus/icons-vue": "^2.3.1",
+-    "pinia": "^2.1.7"
++    "axios": "^1.6.8",
++    "echarts": "^6.0.0",
++    "element-plus": "^2.7.2",
++    "pinia": "^2.1.7",
++    "vue": "^3.4.21",
++    "vue-router": "^4.3.0"
+   },
+   "devDependencies": {
++    "@typescript-eslint/eslint-plugin": "^7.3.0",
++    "@typescript-eslint/parser": "^7.3.0",
+     "@vitejs/plugin-vue": "^5.0.4",
+-    "typescript": "~5.4.0",
+-    "vite": "^5.2.0",
+-    "vue-tsc": "^2.0.6",
+     "eslint": "^8.57.0",
+     "eslint-plugin-vue": "^9.24.0",
+-    "@typescript-eslint/parser": "^7.3.0",
+-    "@typescript-eslint/eslint-plugin": "^7.3.0"
++    "typescript": "~5.4.0",
++    "vite": "^5.2.0",
++    "vue-tsc": "^2.0.6"
+   }
+ }
+diff --git a/frontend/src/api/statistics.ts b/frontend/src/api/statistics.ts
+new file mode 100644
+index 0000000..5988d32
+--- /dev/null
++++ b/frontend/src/api/statistics.ts
+@@ -0,0 +1,21 @@
++import request from './request'
++
++/**
++ * 鑾峰彇浠〃鐩樼粺璁℃暟鎹?+ */
++export const getDashboardStatistics = () => {
++  return request({
++    url: '/statistics/dashboard',
++    method: 'get'
++  })
++}
++
++/**
++ * 鑾峰彇鏈€杩?澶╄秼鍔挎暟鎹?+ */
++export const getTrendData = () => {
++  return request({
++    url: '/statistics/trend',
++    method: 'get'
++  })
++}
+diff --git a/frontend/src/components/Layout.vue b/frontend/src/components/Layout.vue
+new file mode 100644
+index 0000000..47e7c74
+--- /dev/null
++++ b/frontend/src/components/Layout.vue
+@@ -0,0 +1,202 @@
++<template>
++  <el-container class="layout-container">
++    <el-aside
++      width="220px"
++      class="sidebar"
++    >
++      <div class="logo">
++        <el-icon
++          size="28"
++          color="#0d9488"
++        >
++          <Coffee />
++        </el-icon>
++        <span>鐢ㄦ埛绠＄悊绯荤粺</span>
++      </div>
++      <el-menu
++        :default-active="activeMenu"
++        class="sidebar-menu"
++        router
++        background-color="transparent"
++        text-color="#a8a29e"
++        active-text-color="#0d9488"
++      >
++        <el-menu-item index="/dashboard">
++          <el-icon><DataLine /></el-icon>
++          <span>鏁版嵁浠〃鐩?/span>
++        </el-menu-item>
++        <el-menu-item index="/users">
++          <el-icon><User /></el-icon>
++          <span>鐢ㄦ埛绠＄悊</span>
++        </el-menu-item>
++        <el-menu-item index="/orders">
++          <el-icon><ShoppingCart /></el-icon>
++          <span>璁㈠崟绠＄悊</span>
++        </el-menu-item>
++      </el-menu>
++    </el-aside>
++    <el-container>
++      <el-header class="header">
++        <div class="header-left">
++          <breadcrumb />
++        </div>
++        <div class="header-right">
++          <el-dropdown @command="handleCommand">
++            <span class="user-info">
++              <el-avatar
++                :size="32"
++                :icon="UserFilled"
++              />
++              <span class="username">{{ username }}</span>
++              <el-icon><ArrowDown /></el-icon>
++            </span>
++            <template #dropdown>
++              <el-dropdown-menu>
++                <el-dropdown-item command="logout">
++                  <el-icon><SwitchButton /></el-icon>
++                  閫€鍑虹櫥褰?+                </el-dropdown-item>
++              </el-dropdown-menu>
++            </template>
++          </el-dropdown>
++        </div>
++      </el-header>
++      <el-main class="main-content">
++        <router-view />
++      </el-main>
++    </el-container>
++  </el-container>
++</template>
++
++<script setup lang="ts">
++import { computed } from 'vue'
++import { useRoute, useRouter } from 'vue-router'
++import { ElMessage, ElMessageBox } from 'element-plus'
++import { Coffee, DataLine, User, ShoppingCart, UserFilled, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
++
++const route = useRoute()
++const router = useRouter()
++
++const activeMenu = computed(() => route.path)
++const username = computed(() => localStorage.getItem('realName') || localStorage.getItem('username') || '鐢ㄦ埛')
++
++const handleCommand = async (command: string) => {
++  if (command === 'logout') {
++    try {
++      await ElMessageBox.confirm('纭畾瑕侀€€鍑虹櫥褰曞悧锛?, '鎻愮ず', {
++        confirmButtonText: '纭畾',
++        cancelButtonText: '鍙栨秷',
++        type: 'warning'
++      })
++      localStorage.removeItem('token')
++      localStorage.removeItem('username')
++      localStorage.removeItem('realName')
++      ElMessage.success('宸查€€鍑虹櫥褰?)
++      router.push('/login')
++    } catch {
++      // 鐢ㄦ埛鍙栨秷
++    }
++  }
++}
++</script>
++
++<style scoped>
++.layout-container {
++  height: 100vh;
++}
++
++.sidebar {
++  background: linear-gradient(180deg, #fefdfb 0%, #f8f5f1 100%);
++  border-right: 1px solid var(--border-color);
++  display: flex;
++  flex-direction: column;
++}
++
++.logo {
++  height: 64px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  gap: 12px;
++  border-bottom: 1px solid var(--border-color);
++  font-size: 18px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.sidebar-menu {
++  flex: 1;
++  border-right: none;
++  padding: 16px 12px;
++}
++
++.sidebar-menu :deep(.el-menu-item) {
++  border-radius: var(--radius-md);
++  margin-bottom: 8px;
++  height: 48px;
++  line-height: 48px;
++}
++
++.sidebar-menu :deep(.el-menu-item:hover) {
++  background-color: #f0fdfa !important;
++}
++
++.sidebar-menu :deep(.el-menu-item.is-active) {
++  background-color: #f0fdfa !important;
++  font-weight: 500;
++}
++
++.sidebar-menu :deep(.el-icon) {
++  font-size: 20px;
++  margin-right: 12px;
++}
++
++.header {
++  background-color: var(--bg-surface);
++  border-bottom: 1px solid var(--border-color);
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  height: 64px;
++  padding: 0 var(--spacing-lg);
++}
++
++.header-left {
++  display: flex;
++  align-items: center;
++}
++
++.header-right {
++  display: flex;
++  align-items: center;
++}
++
++.user-info {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  cursor: pointer;
++  padding: 4px 8px;
++  border-radius: var(--radius-md);
++  transition: background-color var(--transition-normal);
++}
++
++.user-info:hover {
++  background-color: var(--bg-primary);
++}
++
++.username {
++  font-size: 14px;
++  color: var(--text-primary);
++  max-width: 100px;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.main-content {
++  background-color: var(--bg-primary);
++  padding: 0;
++  overflow-y: auto;
++}
++</style>
+diff --git a/frontend/src/pages/DashboardPage.vue b/frontend/src/pages/DashboardPage.vue
+new file mode 100644
+index 0000000..562b8e2
+--- /dev/null
++++ b/frontend/src/pages/DashboardPage.vue
+@@ -0,0 +1,447 @@
++<template>
++  <div class="page-container">
++    <div class="page-header">
++      <h1>鏁版嵁浠〃鐩?/h1>
++      <p>瀹炴椂鐩戞帶绯荤粺杩愯惀鏁版嵁</p>
++    </div>
++
++    <!-- 缁熻鍗＄墖 -->
++    <el-row
++      :gutter="20"
++      class="stat-cards"
++    >
++      <el-col
++        :xs="24"
++        :sm="12"
++        :lg="6"
++      >
++        <el-card
++          class="stat-card"
++          shadow="hover"
++        >
++          <div class="stat-icon user-icon">
++            <el-icon><User /></el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-label">
++              鐢ㄦ埛鎬绘暟
++            </div>
++            <div class="stat-value">
++              {{ statistics.totalUsers }}
++            </div>
++          </div>
++        </el-card>
++      </el-col>
++      <el-col
++        :xs="24"
++        :sm="12"
++        :lg="6"
++      >
++        <el-card
++          class="stat-card"
++          shadow="hover"
++        >
++          <div class="stat-icon month-icon">
++            <el-icon><Calendar /></el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-label">
++              鏈湀鏂板
++            </div>
++            <div class="stat-value">
++              {{ statistics.monthNewUsers }}
++            </div>
++          </div>
++        </el-card>
++      </el-col>
++      <el-col
++        :xs="24"
++        :sm="12"
++        :lg="6"
++      >
++        <el-card
++          class="stat-card"
++          shadow="hover"
++        >
++          <div class="stat-icon order-icon">
++            <el-icon><ShoppingCart /></el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-label">
++              璁㈠崟鎬绘暟
++            </div>
++            <div class="stat-value">
++              {{ statistics.totalOrders }}
++            </div>
++          </div>
++        </el-card>
++      </el-col>
++      <el-col
++        :xs="24"
++        :sm="12"
++        :lg="6"
++      >
++        <el-card
++          class="stat-card"
++          shadow="hover"
++        >
++          <div class="stat-icon amount-icon">
++            <el-icon><Money /></el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-label">
++              鎬婚噾棰?+            </div>
++            <div class="stat-value">
++              楼{{ formatAmount(statistics.totalAmount) }}
++            </div>
++          </div>
++        </el-card>
++      </el-col>
++    </el-row>
++
++    <!-- 瓒嬪娍鍥捐〃 -->
++    <el-card
++      class="chart-card"
++      shadow="hover"
++    >
++      <template #header>
++        <div class="chart-header">
++          <span>鏈€杩?澶╄秼鍔?/span>
++          <el-radio-group
++            v-model="chartType"
++            size="small"
++          >
++            <el-radio-button label="both">
++              鍏ㄩ儴
++            </el-radio-button>
++            <el-radio-button label="users">
++              鐢ㄦ埛
++            </el-radio-button>
++            <el-radio-button label="orders">
++              璁㈠崟
++            </el-radio-button>
++          </el-radio-group>
++        </div>
++      </template>
++      <div
++        ref="chartRef"
++        class="chart-container"
++      />
++    </el-card>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
++import { User, Calendar, ShoppingCart, Money } from '@element-plus/icons-vue'
++import * as echarts from 'echarts'
++import { getDashboardStatistics, getTrendData } from '@/api/statistics'
++
++const chartRef = ref<HTMLElement>()
++let chartInstance: echarts.ECharts | null = null
++const chartType = ref('both')
++
++const statistics = reactive({
++  totalUsers: 0,
++  monthNewUsers: 0,
++  totalOrders: 0,
++  totalAmount: 0
++})
++
++const trendData = ref<any[]>([])
++
++const formatAmount = (amount: number) => {
++  return amount?.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'
++}
++
++const fetchStatistics = async () => {
++  try {
++    const res: any = await getDashboardStatistics()
++    Object.assign(statistics, res.data)
++  } catch {
++    // 閿欒宸插湪鎷︽埅鍣ㄤ腑澶勭悊
++  }
++}
++
++const fetchTrendData = async () => {
++  try {
++    const res: any = await getTrendData()
++    trendData.value = res.data
++    updateChart()
++  } catch {
++    // 閿欒宸插湪鎷︽埅鍣ㄤ腑澶勭悊
++  }
++}
++
++const initChart = () => {
++  if (!chartRef.value) return
++  chartInstance = echarts.init(chartRef.value)
++  updateChart()
++}
++
++const updateChart = () => {
++  if (!chartInstance) return
++
++  const dates = trendData.value.map(item => item.date)
++  const newUsersData = trendData.value.map(item => item.newUsers)
++  const newOrdersData = trendData.value.map(item => item.newOrders)
++
++  const series: echarts.SeriesOption[] = []
++
++  if (chartType.value === 'both' || chartType.value === 'users') {
++    series.push({
++      name: '鏂板鐢ㄦ埛',
++      type: 'line',
++      data: newUsersData,
++      smooth: true,
++      symbol: 'circle',
++      symbolSize: 8,
++      lineStyle: {
++        width: 3,
++        color: '#409EFF'
++      },
++      itemStyle: {
++        color: '#409EFF'
++      },
++      areaStyle: {
++        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++          { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
++          { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
++        ])
++      }
++    })
++  }
++
++  if (chartType.value === 'both' || chartType.value === 'orders') {
++    series.push({
++      name: '鏂板璁㈠崟',
++      type: 'line',
++      data: newOrdersData,
++      smooth: true,
++      symbol: 'circle',
++      symbolSize: 8,
++      lineStyle: {
++        width: 3,
++        color: '#67C23A'
++      },
++      itemStyle: {
++        color: '#67C23A'
++      },
++      areaStyle: {
++        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++          { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
++          { offset: 1, color: 'rgba(103, 194, 58, 0.05)' }
++        ])
++      }
++    })
++  }
++
++  const option: echarts.EChartsOption = {
++    tooltip: {
++      trigger: 'axis',
++      backgroundColor: 'rgba(255, 255, 255, 0.95)',
++      borderColor: '#e4e7ed',
++      borderWidth: 1,
++      textStyle: {
++        color: '#606266'
++      },
++      axisPointer: {
++        type: 'line',
++        lineStyle: {
++          color: '#409EFF',
++          width: 1,
++          type: 'dashed'
++        }
++      }
++    },
++    legend: {
++      data: chartType.value === 'both' ? ['鏂板鐢ㄦ埛', '鏂板璁㈠崟'] : 
++            chartType.value === 'users' ? ['鏂板鐢ㄦ埛'] : ['鏂板璁㈠崟'],
++      bottom: 0,
++      itemGap: 30,
++      textStyle: {
++        color: '#606266'
++      }
++    },
++    grid: {
++      left: '3%',
++      right: '4%',
++      bottom: '15%',
++      top: '10%',
++      containLabel: true
++    },
++    xAxis: {
++      type: 'category',
++      boundaryGap: false,
++      data: dates,
++      axisLine: {
++        lineStyle: {
++          color: '#dcdfe6'
++        }
++      },
++      axisLabel: {
++        color: '#606266',
++        formatter: (value: string) => {
++          const date = new Date(value)
++          return `${date.getMonth() + 1}/${date.getDate()}`
++        }
++      }
++    },
++    yAxis: {
++      type: 'value',
++      axisLine: {
++        show: false
++      },
++      axisTick: {
++        show: false
++      },
++      splitLine: {
++        lineStyle: {
++          color: '#ebeef5',
++          type: 'dashed'
++        }
++      },
++      axisLabel: {
++        color: '#606266'
++      }
++    },
++    series
++  }
++
++  chartInstance.setOption(option, true)
++}
++
++const handleResize = () => {
++  chartInstance?.resize()
++}
++
++watch(chartType, () => {
++  updateChart()
++})
++
++onMounted(() => {
++  fetchStatistics()
++  fetchTrendData()
++  nextTick(() => {
++    initChart()
++  })
++  window.addEventListener('resize', handleResize)
++})
++
++onUnmounted(() => {
++  window.removeEventListener('resize', handleResize)
++  chartInstance?.dispose()
++})
++</script>
++
++<style scoped>
++.page-container {
++  padding: var(--spacing-lg);
++  max-width: 1400px;
++  margin: 0 auto;
++}
++
++.page-header {
++  margin-bottom: var(--spacing-lg);
++}
++
++.page-header h1 {
++  font-size: 28px;
++  color: var(--text-primary);
++  margin-bottom: 4px;
++}
++
++.page-header p {
++  font-size: 14px;
++  color: var(--text-secondary);
++}
++
++.stat-cards {
++  margin-bottom: var(--spacing-lg);
++}
++
++.stat-card {
++  display: flex;
++  align-items: center;
++  padding: var(--spacing-md);
++  margin-bottom: var(--spacing-md);
++}
++
++.stat-icon {
++  width: 60px;
++  height: 60px;
++  border-radius: 12px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  margin-right: var(--spacing-md);
++}
++
++.stat-icon .el-icon {
++  font-size: 28px;
++  color: #fff;
++}
++
++.user-icon {
++  background: linear-gradient(135deg, #409EFF 0%, #66b1ff 100%);
++}
++
++.month-icon {
++  background: linear-gradient(135deg, #E6A23C 0%, #f0c78a 100%);
++}
++
++.order-icon {
++  background: linear-gradient(135deg, #67C23A 0%, #95d475 100%);
++}
++
++.amount-icon {
++  background: linear-gradient(135deg, #F56C6C 0%, #f89898 100%);
++}
++
++.stat-info {
++  flex: 1;
++}
++
++.stat-label {
++  font-size: 14px;
++  color: var(--text-secondary);
++  margin-bottom: 4px;
++}
++
++.stat-value {
++  font-size: 24px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.chart-card {
++  margin-bottom: var(--spacing-md);
++}
++
++.chart-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++}
++
++.chart-header span {
++  font-size: 16px;
++  font-weight: 500;
++  color: var(--text-primary);
++}
++
++.chart-container {
++  height: 400px;
++}
++
++@media (max-width: 768px) {
++  .stat-card {
++    margin-bottom: var(--spacing-sm);
++  }
++  
++  .chart-container {
++    height: 300px;
++  }
++}
++</style>
+diff --git a/frontend/src/pages/LoginPage.vue b/frontend/src/pages/LoginPage.vue
+index 2166c33..679d639 100644
+--- a/frontend/src/pages/LoginPage.vue
++++ b/frontend/src/pages/LoginPage.vue
+@@ -82,7 +82,7 @@ const handleLogin = async () => {
+     localStorage.setItem('username', res.data.username)
+     localStorage.setItem('realName', res.data.realName)
+     ElMessage.success('鐧诲綍鎴愬姛')
+-    router.push('/users')
++    router.push('/dashboard')
+   } catch {
+     // 閿欒宸插湪鎷︽埅鍣ㄤ腑澶勭悊
+   } finally {
+diff --git a/frontend/src/pages/OrderListPage.vue b/frontend/src/pages/OrderListPage.vue
+new file mode 100644
+index 0000000..460fb44
+--- /dev/null
++++ b/frontend/src/pages/OrderListPage.vue
+@@ -0,0 +1,47 @@
++<template>
++  <div class="page-container">
++    <div class="page-header">
++      <h1>璁㈠崟绠＄悊</h1>
++      <p>绠＄悊绯荤粺涓殑鎵€鏈夎鍗曚俊鎭?/p>
++    </div>
++
++    <el-card class="table-card">
++      <el-empty description="璁㈠崟绠＄悊鍔熻兘寮€鍙戜腑..." />
++    </el-card>
++  </div>
++</template>
++
++<script setup lang="ts">
++// 璁㈠崟绠＄悊椤甸潰 - 鍗犱綅
++</script>
++
++<style scoped>
++.page-container {
++  padding: var(--spacing-lg);
++  max-width: 1200px;
++  margin: 0 auto;
++}
++
++.page-header {
++  margin-bottom: var(--spacing-lg);
++}
++
++.page-header h1 {
++  font-size: 28px;
++  color: var(--text-primary);
++  margin-bottom: 4px;
++}
++
++.page-header p {
++  font-size: 14px;
++  color: var(--text-secondary);
++}
++
++.table-card {
++  margin-bottom: var(--spacing-md);
++  min-height: 400px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++}
++</style>
+diff --git a/frontend/src/router/index.ts b/frontend/src/router/index.ts
+index e56ea11..c51384d 100644
+--- a/frontend/src/router/index.ts
++++ b/frontend/src/router/index.ts
+@@ -11,25 +11,41 @@ const router = createRouter({
+     },
+     {
+       path: '/',
+-      redirect: '/users'
+-    },
+-    {
+-      path: '/users',
+-      name: 'UserList',
+-      component: () => import('@/pages/UserListPage.vue'),
+-      meta: { requiresAuth: true }
+-    },
+-    {
+-      path: '/users/create',
+-      name: 'UserCreate',
+-      component: () => import('@/pages/UserFormPage.vue'),
+-      meta: { requiresAuth: true }
+-    },
+-    {
+-      path: '/users/:id/edit',
+-      name: 'UserEdit',
+-      component: () => import('@/pages/UserFormPage.vue'),
+-      meta: { requiresAuth: true }
++      component: () => import('@/components/Layout.vue'),
++      redirect: '/dashboard',
++      meta: { requiresAuth: true },
++      children: [
++        {
++          path: '/dashboard',
++          name: 'Dashboard',
++          component: () => import('@/pages/DashboardPage.vue'),
++          meta: { requiresAuth: true, title: '鏁版嵁浠〃鐩? }
++        },
++        {
++          path: '/users',
++          name: 'UserList',
++          component: () => import('@/pages/UserListPage.vue'),
++          meta: { requiresAuth: true, title: '鐢ㄦ埛绠＄悊' }
++        },
++        {
++          path: '/users/create',
++          name: 'UserCreate',
++          component: () => import('@/pages/UserFormPage.vue'),
++          meta: { requiresAuth: true, title: '鏂板鐢ㄦ埛' }
++        },
++        {
++          path: '/users/:id/edit',
++          name: 'UserEdit',
++          component: () => import('@/pages/UserFormPage.vue'),
++          meta: { requiresAuth: true, title: '缂栬緫鐢ㄦ埛' }
++        },
++        {
++          path: '/orders',
++          name: 'OrderList',
++          component: () => import('@/pages/OrderListPage.vue'),
++          meta: { requiresAuth: true, title: '璁㈠崟绠＄悊' }
++        }
++      ]
+     }
+   ]
+ })
+@@ -40,7 +56,7 @@ router.beforeEach((to, _from, next) => {
+   if (to.meta.requiresAuth && !token) {
+     next('/login')
+   } else if (to.path === '/login' && token) {
+-    next('/users')
++    next('/dashboard')
+   } else {
+     next()
+   }
+diff --git a/kimi_diff.patch b/kimi_diff.patch
+new file mode 100644
+index 0000000..b947e32
+Binary files /dev/null and b/kimi_diff.patch differ
