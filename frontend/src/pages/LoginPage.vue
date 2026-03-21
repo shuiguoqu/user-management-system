@@ -82,7 +82,7 @@ const handleLogin = async () => {
     localStorage.setItem('username', res.data.username)
     localStorage.setItem('realName', res.data.realName)
     ElMessage.success('登录成功')
-    router.push('/users')
+    router.push('/dashboard')
   } catch {
     // 错误已在拦截器中处理
   } finally {
