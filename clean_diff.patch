@@ -1,0 +1,231 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..ebd6f12
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,59 @@
++name: CI Pipeline
++
++on:
++  push:
++    branches: [ main, master ]
++  pull_request:
++    branches: [ main, master ]
++
++jobs:
++  backend:
++    name: Backend Build & Test
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: ./backend
++    
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@v4
++      
++      - name: Set up JDK 17
++        uses: actions/setup-java@v4
++        with:
++          java-version: '17'
++          distribution: 'temurin'
++          cache: 'maven'
++      
++      - name: Build with Maven
++        run: mvn verify -B
++      
++      - name: Upload test results
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: backend-test-results
++          path: backend/target/surefire-reports/
++
++  frontend:
++    name: Frontend Build
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: ./frontend
++    
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@v4
++      
++      - name: Set up Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++          cache: 'npm'
++      
++      - name: Install dependencies
++        run: npm ci
++      
++      - name: Build
++        run: npm run build
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..c060e03
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,79 @@
++# 鍏ㄦ爤鐢ㄦ埛绠＄悊绯荤粺 - Makefile 蹇嵎鍛戒护
++
++.PHONY: help dev build up down restart logs clean build-backend build-frontend
++
++# 榛樿鐩爣锛氭樉绀哄府鍔?+help:
++	@echo "=== 鍏ㄦ爤鐢ㄦ埛绠＄悊绯荤粺 蹇嵎鍛戒护 ==="
++	@echo ""
++	@echo "寮€鍙戞ā寮?"
++	@echo "  make dev              - 鍚姩寮€鍙戠幆澧冿紙鍓嶅彴鍚庡彴骞惰鍚姩锛?
++	@echo ""
++	@echo "Docker 妯″紡:"
++	@echo "  make build            - 鏋勫缓鎵€鏈?Docker 闀滃儚"
++	@echo "  make up               - 鍚姩鎵€鏈夋湇鍔★紙鍚庡彴妯″紡锛?
++	@echo "  make down             - 鍋滄骞剁Щ闄ゆ墍鏈夋湇鍔?
++	@echo "  make restart          - 閲嶅惎鎵€鏈夋湇鍔?
++	@echo ""
++	@echo "鏃ュ織鏌ョ湅:"
++	@echo "  make logs             - 鏌ョ湅鎵€鏈夋湇鍔℃棩蹇?
++	@echo "  make logs-backend     - 鏌ョ湅鍚庣鏃ュ織"
++	@echo "  make logs-frontend    - 鏌ョ湅鍓嶇鏃ュ織"
++	@echo "  make logs-db          - 鏌ョ湅鏁版嵁搴撴棩蹇?
++	@echo ""
++	@echo "鏋勫缓鍛戒护:"
++	@echo "  make build-backend    - 鏋勫缓鍚庣椤圭洰"
++	@echo "  make build-frontend   - 鏋勫缓鍓嶇椤圭洰"
++	@echo ""
++	@echo "娓呯悊鍛戒护:"
++	@echo "  make clean            - 娓呯悊鏋勫缓浜х墿鍜?Docker 璧勬簮"
++
++# 寮€鍙戞ā寮忥細鍓嶅悗鍙板苟琛屽惎鍔?+dev:
++	@echo "鍚姩寮€鍙戠幆澧?.."
++	@echo "鍚庣: http://localhost:8080"
++	@echo "鍓嶇: http://localhost:5173"
++	@echo ""
++	@echo "璇峰湪涓や釜缁堢鍒嗗埆鎵ц浠ヤ笅鍛戒护:"
++	@echo "鍚庣: cd backend && mvn spring-boot:run"
++	@echo "鍓嶇: cd frontend && npm run dev"
++
++# Docker 鍛戒护
++build:
++	docker compose build
++
++up:
++	docker compose up -d
++
++down:
++	docker compose down
++
++restart:
++	docker compose restart
++
++# 鏃ュ織鍛戒护
++logs:
++	docker compose logs -f
++
++logs-backend:
++	docker compose logs -f backend
++
++logs-frontend:
++	docker compose logs -f frontend
++
++logs-db:
++	docker compose logs -f db
++
++# 椤圭洰鏋勫缓鍛戒护
++build-backend:
++	cd backend && mvn clean package -DskipTests
++
++build-frontend:
++	cd frontend && npm install && npm run build
++
++# 娓呯悊鍛戒护
++clean:
++	docker compose down -v --rmi local
++	cd backend && mvn clean
++	cd frontend && rm -rf dist node_modules
++	@echo "娓呯悊瀹屾垚"
+diff --git a/backend/.dockerignore b/backend/.dockerignore
+new file mode 100644
+index 0000000..7376b20
+--- /dev/null
++++ b/backend/.dockerignore
+@@ -0,0 +1,24 @@
++# Maven build output
++target/
++.mvn/
++
++# IDE
++.idea/
++.vscode/
++*.iml
++*.ipr
++*.iws
++
++# Git
++.git/
++.gitignore
++.gitattributes
++
++# Docker
++Dockerfile
++.dockerignore
++
++# Misc
++*.log
++tmp/
++temp/
+diff --git a/backend/Dockerfile b/backend/Dockerfile
+index c55e0be..e7c1cfa 100644
+--- a/backend/Dockerfile
++++ b/backend/Dockerfile
+@@ -7,11 +7,15 @@ COPY settings.xml /root/.m2/settings.xml
+ 
+ # 鍏堝鍒?pom.xml 鍒╃敤 Docker 缂撳瓨涓嬭浇渚濊禆
+ COPY pom.xml .
+-RUN mvn dependency:go-offline -B
++
++# 浣跨敤 Docker BuildKit 缂撳瓨鍔犻€?Maven 渚濊禆涓嬭浇
++RUN --mount=type=cache,target=/root/.m2/repository \
++    mvn dependency:go-offline -B
+ 
+ # 澶嶅埗婧愮爜骞舵瀯寤? COPY src ./src
+-RUN mvn package -DskipTests -B
++RUN --mount=type=cache,target=/root/.m2/repository \
++    mvn package -DskipTests -B
+ 
+ # ---- Runtime Stage ----
+ FROM eclipse-temurin:17-jre
+@@ -26,4 +30,9 @@ COPY --from=builder /app/target/*.jar app.jar
+ 
+ EXPOSE 8080
+ 
+-ENTRYPOINT ["java", "-Dfile.encoding=UTF-8", "-jar", "app.jar"]
++# 鍋ュ悍妫€鏌?- 妫€娴?8080 绔彛鏄惁鍙敤
++HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
++    CMD curl -f http://localhost:8080/ 2>/dev/null || wget -qO- http://localhost:8080/ 2>/dev/null || exit 1
++
++# 浣跨敤 JAVA_OPTS 鐜鍙橀噺鍚姩搴旂敤
++ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+diff --git a/docker-compose.yml b/docker-compose.yml
+index d08e9d5..309eab1 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -48,9 +48,16 @@ services:
+       SPRING_DATASOURCE_USERNAME: root
+       SPRING_DATASOURCE_PASSWORD: root123456
+       TZ: Asia/Shanghai
++      JAVA_OPTS: -Xmx512m -Xms256m -Dfile.encoding=UTF-8
+     depends_on:
+       db:
+         condition: service_healthy
++    healthcheck:
++      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
++      interval: 30s
++      timeout: 10s
++      retries: 3
++      start_period: 60s
+     networks:
+       - app-network
+ 
