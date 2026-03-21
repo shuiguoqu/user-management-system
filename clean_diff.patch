@@ -1,0 +1,1510 @@
+diff --git a/backend/pom.xml b/backend/pom.xml
+index ee055c4..376f653 100644
+--- a/backend/pom.xml
++++ b/backend/pom.xml
+@@ -112,6 +112,17 @@
+                     </excludes>
+                 </configuration>
+             </plugin>
++            <plugin>
++                <groupId>org.apache.maven.plugins</groupId>
++                <artifactId>maven-surefire-plugin</artifactId>
++                <version>3.2.5</version>
++                <configuration>
++                    <includes>
++                        <include>**/*Test.java</include>
++                        <include>**/*Tests.java</include>
++                    </includes>
++                </configuration>
++            </plugin>
+         </plugins>
+     </build>
+ 
+diff --git a/backend/src/test/java/com/labelease/usermanagement/common/JwtUtilTest.java b/backend/src/test/java/com/labelease/usermanagement/common/JwtUtilTest.java
+new file mode 100644
+index 0000000..bb652eb
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/common/JwtUtilTest.java
+@@ -0,0 +1,325 @@
++package com.labelease.usermanagement.common;
++
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Nested;
++import org.junit.jupiter.api.Test;
++import org.springframework.test.util.ReflectionTestUtils;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++@DisplayName("JwtUtil 鍗曞厓娴嬭瘯")
++class JwtUtilTest {
++
++    private JwtUtil jwtUtil;
++
++    private static final String TEST_SECRET = "thisIsAVeryLongSecretKeyForJwtTokenGenerationAndValidation123456789";
++    private static final long TEST_EXPIRATION = 3600000L;
++    private static final String TEST_USERNAME = "testuser";
++
++    @BeforeEach
++    void setUp() {
++        jwtUtil = new JwtUtil();
++        ReflectionTestUtils.setField(jwtUtil, "secret", TEST_SECRET);
++        ReflectionTestUtils.setField(jwtUtil, "expiration", TEST_EXPIRATION);
++    }
++
++    @Nested
++    @DisplayName("Token 鐢熸垚娴嬭瘯")
++    class GenerateTokenTests {
++
++        @Test
++        @DisplayName("鐢熸垚 Token - 鎴愬姛杩斿洖闈炵┖瀛楃涓?)
++        void generateToken_Success() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            assertNotNull(token);
++            assertFalse(token.isEmpty());
++            assertTrue(token.split("\\.").length == 3);
++        }
++
++        @Test
++        @DisplayName("鐢熸垚 Token - 涓嶅悓鐢ㄦ埛鍚嶇敓鎴愪笉鍚?Token")
++        void generateToken_DifferentUsers_DifferentTokens() {
++            String token1 = jwtUtil.generateToken("user1");
++            String token2 = jwtUtil.generateToken("user2");
++
++            assertNotNull(token1);
++            assertNotNull(token2);
++            assertNotEquals(token1, token2);
++        }
++
++        @Test
++        @DisplayName("鐢熸垚 Token - 鐩稿悓鐢ㄦ埛鍚嶅娆＄敓鎴愪笉鍚?Token锛堟椂闂存埑涓嶅悓锛?)
++        void generateToken_SameUser_DifferentTokens() throws InterruptedException {
++            String token1 = jwtUtil.generateToken(TEST_USERNAME);
++            Thread.sleep(1000);
++            String token2 = jwtUtil.generateToken(TEST_USERNAME);
++
++            assertNotNull(token1);
++            assertNotNull(token2);
++            assertNotEquals(token1, token2);
++        }
++
++        @Test
++        @DisplayName("鐢熸垚 Token - 鍖呭惈姝ｇ‘鐨勭敤鎴峰悕")
++        void generateToken_ContainsCorrectUsername() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            String extractedUsername = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(TEST_USERNAME, extractedUsername);
++        }
++
++        @Test
++        @DisplayName("鐢熸垚 Token - 鐗规畩瀛楃鐢ㄦ埛鍚?)
++        void generateToken_SpecialCharacters() {
++            String specialUsername = "user@domain.com";
++
++            String token = jwtUtil.generateToken(specialUsername);
++            String extracted = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(specialUsername, extracted);
++        }
++
++        @Test
++        @DisplayName("鐢熸垚 Token - 涓枃鐢ㄦ埛鍚?)
++        void generateToken_ChineseUsername() {
++            String chineseUsername = "娴嬭瘯鐢ㄦ埛";
++
++            String token = jwtUtil.generateToken(chineseUsername);
++            String extracted = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(chineseUsername, extracted);
++        }
++    }
++
++    @Nested
++    @DisplayName("Token 瑙ｆ瀽娴嬭瘯")
++    class ParseTokenTests {
++
++        @Test
++        @DisplayName("瑙ｆ瀽 Token - 鎴愬姛鑾峰彇鐢ㄦ埛鍚?)
++        void getUsernameFromToken_Success() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            String username = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(TEST_USERNAME, username);
++        }
++
++        @Test
++        @DisplayName("瑙ｆ瀽 Token - 绌篢oken鎶涘嚭寮傚父")
++        void getUsernameFromToken_EmptyToken_ThrowsException() {
++            assertThrows(Exception.class, () -> {
++                jwtUtil.getUsernameFromToken("");
++            });
++        }
++
++        @Test
++        @DisplayName("瑙ｆ瀽 Token - null Token鎶涘嚭寮傚父")
++        void getUsernameFromToken_NullToken_ThrowsException() {
++            assertThrows(Exception.class, () -> {
++                jwtUtil.getUsernameFromToken(null);
++            });
++        }
++
++        @Test
++        @DisplayName("瑙ｆ瀽 Token - 鏍煎紡閿欒鐨凾oken鎶涘嚭寮傚父")
++        void getUsernameFromToken_MalformedToken_ThrowsException() {
++            String malformedToken = "invalid.token.format";
++
++            assertThrows(Exception.class, () -> {
++                jwtUtil.getUsernameFromToken(malformedToken);
++            });
++        }
++
++        @Test
++        @DisplayName("瑙ｆ瀽 Token - 琚鏀圭殑Token鎶涘嚭寮傚父")
++        void getUsernameFromToken_TamperedToken_ThrowsException() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++            String tamperedToken = token + "tampered";
++
++            assertThrows(Exception.class, () -> {
++                jwtUtil.getUsernameFromToken(tamperedToken);
++            });
++        }
++    }
++
++    @Nested
++    @DisplayName("Token 楠岃瘉娴嬭瘯")
++    class ValidateTokenTests {
++
++        @Test
++        @DisplayName("楠岃瘉 Token - 鏈夋晥Token杩斿洖true")
++        void validateToken_ValidToken_ReturnsTrue() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            boolean isValid = jwtUtil.validateToken(token);
++
++            assertTrue(isValid);
++        }
++
++        @Test
++        @DisplayName("楠岃瘉 Token - 绌篢oken杩斿洖false")
++        void validateToken_EmptyToken_ReturnsFalse() {
++            boolean isValid = jwtUtil.validateToken("");
++
++            assertFalse(isValid);
++        }
++
++        @Test
++        @DisplayName("楠岃瘉 Token - null Token杩斿洖false")
++        void validateToken_NullToken_ReturnsFalse() {
++            boolean isValid = jwtUtil.validateToken(null);
++
++            assertFalse(isValid);
++        }
++
++        @Test
++        @DisplayName("楠岃瘉 Token - 鏍煎紡閿欒鐨凾oken杩斿洖false")
++        void validateToken_MalformedToken_ReturnsFalse() {
++            boolean isValid = jwtUtil.validateToken("invalid.token.format");
++
++            assertFalse(isValid);
++        }
++
++        @Test
++        @DisplayName("楠岃瘉 Token - 琚鏀圭殑Token杩斿洖false")
++        void validateToken_TamperedToken_ReturnsFalse() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++            String tamperedToken = token.substring(0, token.length() - 5) + "xxxxx";
++
++            boolean isValid = jwtUtil.validateToken(tamperedToken);
++
++            assertFalse(isValid);
++        }
++
++        @Test
++        @DisplayName("楠岃瘉 Token - 浣跨敤涓嶅悓瀵嗛挜绛惧悕鐨凾oken杩斿洖false")
++        void validateToken_DifferentSecret_ReturnsFalse() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            JwtUtil anotherJwtUtil = new JwtUtil();
++            ReflectionTestUtils.setField(anotherJwtUtil, "secret", "anotherSecretKeyForTestingDifferentSignature12345678");
++            ReflectionTestUtils.setField(anotherJwtUtil, "expiration", TEST_EXPIRATION);
++
++            boolean isValid = anotherJwtUtil.validateToken(token);
++
++            assertFalse(isValid);
++        }
++    }
++
++    @Nested
++    @DisplayName("Token 鐢熸垚涓庤В鏋愪竴鑷存€ф祴璇?)
++    class ConsistencyTests {
++
++        @Test
++        @DisplayName("涓€鑷存€?- 鐢熸垚鍚庣珛鍗宠В鏋愮敤鎴峰悕涓€鑷?)
++        void consistency_ImmediateParse_Success() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            String extractedUsername = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(TEST_USERNAME, extractedUsername);
++        }
++
++        @Test
++        @DisplayName("涓€鑷存€?- 鐢熸垚鍚庣珛鍗抽獙璇佹湁鏁?)
++        void consistency_ImmediateValidate_Success() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            boolean isValid = jwtUtil.validateToken(token);
++
++            assertTrue(isValid);
++        }
++
++        @Test
++        @DisplayName("涓€鑷存€?- 澶氭瑙ｆ瀽缁撴灉涓€鑷?)
++        void consistency_MultipleParse_SameResult() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            String username1 = jwtUtil.getUsernameFromToken(token);
++            String username2 = jwtUtil.getUsernameFromToken(token);
++            String username3 = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(username1, username2);
++            assertEquals(username2, username3);
++            assertEquals(TEST_USERNAME, username1);
++        }
++    }
++
++    @Nested
++    @DisplayName("Token 杩囨湡娴嬭瘯")
++    class ExpirationTests {
++
++        @Test
++        @DisplayName("杩囨湡娴嬭瘯 - 璁剧疆鐭繃鏈熸椂闂村悗Token杩囨湡")
++        void expiration_TokenExpires() throws InterruptedException {
++            JwtUtil shortExpirationJwtUtil = new JwtUtil();
++            ReflectionTestUtils.setField(shortExpirationJwtUtil, "secret", TEST_SECRET);
++            ReflectionTestUtils.setField(shortExpirationJwtUtil, "expiration", 1000L);
++
++            String token = shortExpirationJwtUtil.generateToken(TEST_USERNAME);
++
++            assertTrue(shortExpirationJwtUtil.validateToken(token));
++
++            Thread.sleep(1500);
++
++            assertFalse(shortExpirationJwtUtil.validateToken(token));
++        }
++
++        @Test
++        @DisplayName("杩囨湡娴嬭瘯 - 姝ｅ父杩囨湡鏃堕棿鍐匱oken鏈夋晥")
++        void expiration_TokenValidWithinExpiration() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            boolean isValid = jwtUtil.validateToken(token);
++
++            assertTrue(isValid);
++        }
++    }
++
++    @Nested
++    @DisplayName("杈圭晫鏉′欢娴嬭瘯")
++    class EdgeCaseTests {
++
++        @Test
++        @DisplayName("杈圭晫鏉′欢 - 绌哄瓧绗︿覆鐢ㄦ埛鍚?)
++        void edgeCase_EmptyUsername() {
++            String token = jwtUtil.generateToken("");
++
++            String username = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals("", username);
++        }
++
++        @Test
++        @DisplayName("杈圭晫鏉′欢 - 瓒呴暱鐢ㄦ埛鍚?)
++        void edgeCase_VeryLongUsername() {
++            StringBuilder sb = new StringBuilder();
++            for (int i = 0; i < 1000; i++) {
++                sb.append("a");
++            }
++            String longUsername = sb.toString();
++
++            String token = jwtUtil.generateToken(longUsername);
++            String extracted = jwtUtil.getUsernameFromToken(token);
++
++            assertEquals(longUsername, extracted);
++        }
++
++        @Test
++        @DisplayName("杈圭晫鏉′欢 - Token鏍煎紡楠岃瘉锛堜笁娈靛紡锛?)
++        void edgeCase_TokenFormat() {
++            String token = jwtUtil.generateToken(TEST_USERNAME);
++
++            String[] parts = token.split("\\.");
++
++            assertEquals(3, parts.length);
++            assertTrue(parts[0].length() > 0);
++            assertTrue(parts[1].length() > 0);
++            assertTrue(parts[2].length() > 0);
++        }
++    }
++}
+diff --git a/backend/src/test/java/com/labelease/usermanagement/controller/AuthControllerTest.java b/backend/src/test/java/com/labelease/usermanagement/controller/AuthControllerTest.java
+new file mode 100644
+index 0000000..68f9ace
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/controller/AuthControllerTest.java
+@@ -0,0 +1,332 @@
++package com.labelease.usermanagement.controller;
++
++import com.labelease.usermanagement.common.JwtUtil;
++import com.labelease.usermanagement.common.Result;
++import com.labelease.usermanagement.entity.User;
++import com.labelease.usermanagement.service.UserService;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Nested;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.security.crypto.password.PasswordEncoder;
++
++import java.time.LocalDateTime;
++import java.util.HashMap;
++import java.util.Map;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.anyString;
++import static org.mockito.Mockito.*;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("AuthController 鍗曞厓娴嬭瘯")
++class AuthControllerTest {
++
++    @Mock
++    private UserService userService;
++
++    @Mock
++    private JwtUtil jwtUtil;
++
++    @Mock
++    private PasswordEncoder passwordEncoder;
++
++    @InjectMocks
++    private AuthController authController;
++
++    private User testUser;
++    private static final String TEST_USERNAME = "testuser";
++    private static final String TEST_PASSWORD = "password123";
++    private static final String ENCODED_PASSWORD = "$2a$10$encodedPasswordHash";
++    private static final String TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test";
++
++    @BeforeEach
++    void setUp() {
++        testUser = new User();
++        testUser.setId(1L);
++        testUser.setUsername(TEST_USERNAME);
++        testUser.setPassword(ENCODED_PASSWORD);
++        testUser.setRealName("娴嬭瘯鐢ㄦ埛");
++        testUser.setEmail("test@example.com");
++        testUser.setPhone("13800138000");
++        testUser.setStatus(1);
++        testUser.setDeleted(0);
++        testUser.setCreateTime(LocalDateTime.now());
++        testUser.setUpdateTime(LocalDateTime.now());
++    }
++
++    @Nested
++    @DisplayName("鐧诲綍娴嬭瘯")
++    class LoginTests {
++
++        @Test
++        @DisplayName("鐧诲綍鎴愬姛 - 杩斿洖JWT Token")
++        void login_Success_ReturnsToken() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", TEST_USERNAME);
++            credentials.put("password", TEST_PASSWORD);
++
++            when(userService.getByUsername(TEST_USERNAME)).thenReturn(testUser);
++            when(passwordEncoder.matches(TEST_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
++            when(jwtUtil.generateToken(TEST_USERNAME)).thenReturn(TEST_TOKEN);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(200, result.getCode());
++            assertEquals("鐧诲綍鎴愬姛", result.getMessage());
++            assertNotNull(result.getData());
++
++            @SuppressWarnings("unchecked")
++            Map<String, String> data = (Map<String, String>) result.getData();
++            assertEquals(TEST_TOKEN, data.get("token"));
++            assertEquals(TEST_USERNAME, data.get("username"));
++            assertEquals("娴嬭瘯鐢ㄦ埛", data.get("realName"));
++
++            verify(userService, times(1)).getByUsername(TEST_USERNAME);
++            verify(passwordEncoder, times(1)).matches(TEST_PASSWORD, ENCODED_PASSWORD);
++            verify(jwtUtil, times(1)).generateToken(TEST_USERNAME);
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 鐢ㄦ埛鍚嶉敊璇?)
++        void login_WrongUsername_Returns401() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", "wronguser");
++            credentials.put("password", TEST_PASSWORD);
++
++            when(userService.getByUsername("wronguser")).thenReturn(null);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(401, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒", result.getMessage());
++            assertNull(result.getData());
++
++            verify(userService, times(1)).getByUsername("wronguser");
++            verify(passwordEncoder, never()).matches(anyString(), anyString());
++            verify(jwtUtil, never()).generateToken(anyString());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 瀵嗙爜閿欒")
++        void login_WrongPassword_Returns401() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", TEST_USERNAME);
++            credentials.put("password", "wrongpassword");
++
++            when(userService.getByUsername(TEST_USERNAME)).thenReturn(testUser);
++            when(passwordEncoder.matches("wrongpassword", ENCODED_PASSWORD)).thenReturn(false);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(401, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒", result.getMessage());
++            assertNull(result.getData());
++
++            verify(userService, times(1)).getByUsername(TEST_USERNAME);
++            verify(passwordEncoder, times(1)).matches("wrongpassword", ENCODED_PASSWORD);
++            verify(jwtUtil, never()).generateToken(anyString());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 璐︽埛琚鐢?)
++        void login_AccountDisabled_Returns403() {
++            testUser.setStatus(0);
++
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", TEST_USERNAME);
++            credentials.put("password", TEST_PASSWORD);
++
++            when(userService.getByUsername(TEST_USERNAME)).thenReturn(testUser);
++            when(passwordEncoder.matches(TEST_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(403, result.getCode());
++            assertEquals("璐︽埛宸茶绂佺敤", result.getMessage());
++            assertNull(result.getData());
++
++            verify(userService, times(1)).getByUsername(TEST_USERNAME);
++            verify(passwordEncoder, times(1)).matches(TEST_PASSWORD, ENCODED_PASSWORD);
++            verify(jwtUtil, never()).generateToken(anyString());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 鐢ㄦ埛鍚嶄负绌?)
++        void login_EmptyUsername_Returns400() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", null);
++            credentials.put("password", TEST_PASSWORD);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(400, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++
++            verify(userService, never()).getByUsername(anyString());
++            verify(passwordEncoder, never()).matches(anyString(), anyString());
++            verify(jwtUtil, never()).generateToken(anyString());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 瀵嗙爜涓虹┖")
++        void login_EmptyPassword_Returns400() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", TEST_USERNAME);
++            credentials.put("password", null);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(400, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++
++            verify(userService, never()).getByUsername(anyString());
++            verify(passwordEncoder, never()).matches(anyString(), anyString());
++            verify(jwtUtil, never()).generateToken(anyString());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 鐢ㄦ埛鍚嶅拰瀵嗙爜閮戒负绌?)
++        void login_EmptyCredentials_Returns400() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", null);
++            credentials.put("password", null);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(400, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 鍑瘉Map涓棤username閿?)
++        void login_MissingUsernameKey_Returns400() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("password", TEST_PASSWORD);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(400, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 鍑瘉Map涓棤password閿?)
++        void login_MissingPasswordKey_Returns400() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", TEST_USERNAME);
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(400, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++        }
++
++        @Test
++        @DisplayName("鐧诲綍澶辫触 - 绌哄嚟璇丮ap")
++        void login_EmptyCredentialsMap_Returns400() {
++            Map<String, String> credentials = new HashMap<>();
++
++            Result<?> result = authController.login(credentials);
++
++            assertNotNull(result);
++            assertEquals(400, result.getCode());
++            assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++        }
++    }
++
++    @Nested
++    @DisplayName("鍋ュ悍妫€鏌ユ祴璇?)
++    class HealthTests {
++
++        @Test
++        @DisplayName("鍋ュ悍妫€鏌?- 杩斿洖姝ｅ父鐘舵€?)
++        void health_ReturnsOk() {
++            Result<String> result = authController.health();
++
++            assertNotNull(result);
++            assertEquals(200, result.getCode());
++            assertEquals("鏈嶅姟杩愯姝ｅ父", result.getData());
++        }
++    }
++
++    @Nested
++    @DisplayName("Token 鐢熸垚楠岃瘉娴嬭瘯")
++    class TokenGenerationTests {
++
++        @Test
++        @DisplayName("Token鐢熸垚 - 鐧诲綍鎴愬姛鏃剁敓鎴怲oken")
++        void tokenGeneration_OnLoginSuccess() {
++            Map<String, String> credentials = new HashMap<>();
++            credentials.put("username", TEST_USERNAME);
++            credentials.put("password", TEST_PASSWORD);
++
++            when(userService.getByUsername(TEST_USERNAME)).thenReturn(testUser);
++            when(passwordEncoder.matches(TEST_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
++            when(jwtUtil.generateToken(TEST_USERNAME)).thenReturn(TEST_TOKEN);
++
++            Result<?> result = authController.login(credentials);
++
++            verify(jwtUtil, times(1)).generateToken(TEST_USERNAME);
++
++            @SuppressWarnings("unchecked")
++            Map<String, String> data = (Map<String, String>) result.getData();
++            assertNotNull(data.get("token"));
++        }
++
++        @Test
++        @DisplayName("Token鐢熸垚 - 涓嶅悓鐢ㄦ埛鐢熸垚涓嶅悓Token")
++        void tokenGeneration_DifferentUsers() {
++            String user1 = "user1";
++            String user2 = "user2";
++            String token1 = "token1";
++            String token2 = "token2";
++
++            when(jwtUtil.generateToken(user1)).thenReturn(token1);
++            when(jwtUtil.generateToken(user2)).thenReturn(token2);
++
++            String generatedToken1 = jwtUtil.generateToken(user1);
++            String generatedToken2 = jwtUtil.generateToken(user2);
++
++            assertNotEquals(generatedToken1, generatedToken2);
++        }
++    }
++
++    @Nested
++    @DisplayName("瀵嗙爜楠岃瘉娴嬭瘯")
++    class PasswordValidationTests {
++
++        @Test
++        @DisplayName("瀵嗙爜楠岃瘉 - BCrypt鍖归厤鎴愬姛")
++        void passwordValidation_MatchSuccess() {
++            when(passwordEncoder.matches(TEST_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
++
++            boolean matches = passwordEncoder.matches(TEST_PASSWORD, ENCODED_PASSWORD);
++
++            assertTrue(matches);
++        }
++
++        @Test
++        @DisplayName("瀵嗙爜楠岃瘉 - BCrypt鍖归厤澶辫触")
++        void passwordValidation_MatchFailure() {
++            when(passwordEncoder.matches("wrongpassword", ENCODED_PASSWORD)).thenReturn(false);
++
++            boolean matches = passwordEncoder.matches("wrongpassword", ENCODED_PASSWORD);
++
++            assertFalse(matches);
++        }
++    }
++}
+diff --git a/backend/src/test/java/com/labelease/usermanagement/service/impl/OrderServiceImplTest.java b/backend/src/test/java/com/labelease/usermanagement/service/impl/OrderServiceImplTest.java
+new file mode 100644
+index 0000000..a57ea53
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/service/impl/OrderServiceImplTest.java
+@@ -0,0 +1,434 @@
++package com.labelease.usermanagement.service.impl;
++
++import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
++import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.labelease.usermanagement.entity.Order;
++import com.labelease.usermanagement.mapper.OrderMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Nested;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.math.BigDecimal;
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.*;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("OrderService 鍗曞厓娴嬭瘯")
++class OrderServiceImplTest {
++
++    @Mock
++    private OrderMapper orderMapper;
++
++    @InjectMocks
++    private OrderServiceImpl orderService;
++
++    private Order testOrder;
++
++    @BeforeEach
++    void setUp() {
++        testOrder = new Order();
++        testOrder.setId(1L);
++        testOrder.setOrderNo("ORD202401010001");
++        testOrder.setUserId(1L);
++        testOrder.setProductName("娴嬭瘯鍟嗗搧");
++        testOrder.setAmount(new BigDecimal("99.99"));
++        testOrder.setStatus(0);
++        testOrder.setDeleted(0);
++        testOrder.setCreateTime(LocalDateTime.now());
++        testOrder.setUpdateTime(LocalDateTime.now());
++    }
++
++    @Nested
++    @DisplayName("璁㈠崟鍒涘缓娴嬭瘯")
++    class CreateOrderTests {
++
++        @Test
++        @DisplayName("姝ｅ父鍒涘缓璁㈠崟 - 鎴愬姛淇濆瓨")
++        void createOrder_Success() {
++            when(orderMapper.insert(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.save(testOrder);
++
++            assertTrue(result);
++            verify(orderMapper, times(1)).insert(any(Order.class));
++        }
++
++        @Test
++        @DisplayName("鍒涘缓璁㈠崟 - 閲戦涓洪浂")
++        void createOrder_ZeroAmount() {
++            testOrder.setAmount(BigDecimal.ZERO);
++            when(orderMapper.insert(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.save(testOrder);
++
++            assertTrue(result);
++            assertEquals(BigDecimal.ZERO, testOrder.getAmount());
++        }
++
++        @Test
++        @DisplayName("鍒涘缓璁㈠崟 - 閲戦涓鸿礋鏁版椂浠嶅彲淇濆瓨锛堜笟鍔″眰涓嶅仛鏍￠獙锛?)
++        void createOrder_NegativeAmount() {
++            testOrder.setAmount(new BigDecimal("-10.00"));
++            when(orderMapper.insert(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.save(testOrder);
++
++            assertTrue(result);
++            assertEquals(new BigDecimal("-10.00"), testOrder.getAmount());
++        }
++
++        @Test
++        @DisplayName("鍒涘缓璁㈠崟 - 澶ч噾棰濊鍗?)
++        void createOrder_LargeAmount() {
++            testOrder.setAmount(new BigDecimal("999999.99"));
++            when(orderMapper.insert(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.save(testOrder);
++
++            assertTrue(result);
++            assertEquals(new BigDecimal("999999.99"), testOrder.getAmount());
++        }
++
++        @Test
++        @DisplayName("鍒涘缓璁㈠崟 - 鍒濆鐘舵€佷负寰呮敮浠?)
++        void createOrder_InitialStatus() {
++            testOrder.setStatus(0);
++            when(orderMapper.insert(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.save(testOrder);
++
++            assertTrue(result);
++            assertEquals(0, testOrder.getStatus());
++        }
++    }
++
++    @Nested
++    @DisplayName("璁㈠崟鏌ヨ娴嬭瘯")
++    class QueryOrderTests {
++
++        @Test
++        @DisplayName("鏍规嵁鐢ㄦ埛ID鏌ヨ璁㈠崟 - 鐢ㄦ埛鏈夎鍗?)
++        void listByUserId_UserHasOrders() {
++            Order order2 = new Order();
++            order2.setId(2L);
++            order2.setOrderNo("ORD202401010002");
++            order2.setUserId(1L);
++
++            when(orderMapper.selectByUserId(1L)).thenReturn(Arrays.asList(testOrder, order2));
++
++            List<Order> result = orderService.listByUserId(1L);
++
++            assertNotNull(result);
++            assertEquals(2, result.size());
++            result.forEach(o -> assertEquals(1L, o.getUserId()));
++            verify(orderMapper, times(1)).selectByUserId(1L);
++        }
++
++        @Test
++        @DisplayName("鏍规嵁鐢ㄦ埛ID鏌ヨ璁㈠崟 - 鐢ㄦ埛鏃犺鍗?)
++        void listByUserId_UserHasNoOrders() {
++            when(orderMapper.selectByUserId(999L)).thenReturn(new ArrayList<>());
++
++            List<Order> result = orderService.listByUserId(999L);
++
++            assertNotNull(result);
++            assertTrue(result.isEmpty());
++            verify(orderMapper, times(1)).selectByUserId(999L);
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ璁㈠崟 - 涓嶅甫鍏抽敭瀛?)
++        void pageOrders_WithoutKeyword() {
++            Page<Order> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testOrder));
++            mockPage.setTotal(1);
++
++            when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<Order> result = orderService.pageOrders(1, 10, null);
++
++            assertNotNull(result);
++            assertEquals(1, result.getTotal());
++            assertEquals(1, result.getRecords().size());
++            verify(orderMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ璁㈠崟 - 鎸夎鍗曠紪鍙锋悳绱?)
++        void pageOrders_SearchByOrderNo() {
++            Page<Order> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testOrder));
++            mockPage.setTotal(1);
++
++            when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<Order> result = orderService.pageOrders(1, 10, "ORD202401010001");
++
++            assertNotNull(result);
++            assertEquals(1, result.getTotal());
++            verify(orderMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ璁㈠崟 - 鎸夊晢鍝佸悕绉版悳绱?)
++        void pageOrders_SearchByProductName() {
++            Page<Order> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testOrder));
++            mockPage.setTotal(1);
++
++            when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<Order> result = orderService.pageOrders(1, 10, "娴嬭瘯鍟嗗搧");
++
++            assertNotNull(result);
++            assertEquals(1, result.getTotal());
++            verify(orderMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ璁㈠崟 - 绌哄叧閿瓧")
++        void pageOrders_EmptyKeyword() {
++            Page<Order> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testOrder));
++            mockPage.setTotal(1);
++
++            when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<Order> result = orderService.pageOrders(1, 10, "");
++
++            assertNotNull(result);
++            verify(orderMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鏍规嵁ID鏌ヨ璁㈠崟 - 璁㈠崟瀛樺湪")
++        void getById_OrderExists() {
++            when(orderMapper.selectById(1L)).thenReturn(testOrder);
++
++            Order result = orderService.getById(1L);
++
++            assertNotNull(result);
++            assertEquals(1L, result.getId());
++            assertEquals("ORD202401010001", result.getOrderNo());
++            verify(orderMapper, times(1)).selectById(1L);
++        }
++
++        @Test
++        @DisplayName("鏍规嵁ID鏌ヨ璁㈠崟 - 璁㈠崟涓嶅瓨鍦?)
++        void getById_OrderNotExists() {
++            when(orderMapper.selectById(999L)).thenReturn(null);
++
++            Order result = orderService.getById(999L);
++
++            assertNull(result);
++            verify(orderMapper, times(1)).selectById(999L);
++        }
++    }
++
++    @Nested
++    @DisplayName("璁㈠崟鏇存柊娴嬭瘯")
++    class UpdateOrderTests {
++
++        @Test
++        @DisplayName("姝ｅ父鏇存柊璁㈠崟 - 鏇存柊鐘舵€?)
++        void updateOrder_Status_Success() {
++            testOrder.setStatus(1);
++            when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.updateById(testOrder);
++
++            assertTrue(result);
++            assertEquals(1, testOrder.getStatus());
++            verify(orderMapper, times(1)).updateById(any(Order.class));
++        }
++
++        @Test
++        @DisplayName("姝ｅ父鏇存柊璁㈠崟 - 鏇存柊閲戦")
++        void updateOrder_Amount_Success() {
++            testOrder.setAmount(new BigDecimal("199.99"));
++            when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.updateById(testOrder);
++
++            assertTrue(result);
++            assertEquals(new BigDecimal("199.99"), testOrder.getAmount());
++        }
++
++        @Test
++        @DisplayName("鏇存柊涓嶅瓨鍦ㄧ殑璁㈠崟 - 杩斿洖澶辫触")
++        void updateOrder_NotExist_ReturnsFalse() {
++            Order nonExistentOrder = new Order();
++            nonExistentOrder.setId(999L);
++            nonExistentOrder.setOrderNo("ORD999");
++
++            when(orderMapper.updateById(any(Order.class))).thenReturn(0);
++
++            boolean result = orderService.updateById(nonExistentOrder);
++
++            assertFalse(result);
++            verify(orderMapper, times(1)).updateById(any(Order.class));
++        }
++
++        @Test
++        @DisplayName("璁㈠崟鐘舵€佹祦杞?- 寰呮敮浠樺埌宸叉敮浠?)
++        void updateOrder_StatusTransition_ToPaid() {
++            testOrder.setStatus(0);
++            testOrder.setStatus(1);
++            when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.updateById(testOrder);
++
++            assertTrue(result);
++            assertEquals(1, testOrder.getStatus());
++        }
++
++        @Test
++        @DisplayName("璁㈠崟鐘舵€佹祦杞?- 宸叉敮浠樺埌宸插彂璐?)
++        void updateOrder_StatusTransition_ToShipped() {
++            testOrder.setStatus(1);
++            testOrder.setStatus(2);
++            when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.updateById(testOrder);
++
++            assertTrue(result);
++            assertEquals(2, testOrder.getStatus());
++        }
++
++        @Test
++        @DisplayName("璁㈠崟鐘舵€佹祦杞?- 宸插彂璐у埌宸插畬鎴?)
++        void updateOrder_StatusTransition_ToCompleted() {
++            testOrder.setStatus(2);
++            testOrder.setStatus(3);
++            when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.updateById(testOrder);
++
++            assertTrue(result);
++            assertEquals(3, testOrder.getStatus());
++        }
++
++        @Test
++        @DisplayName("璁㈠崟鐘舵€佹祦杞?- 鍙栨秷璁㈠崟")
++        void updateOrder_StatusTransition_ToCancelled() {
++            testOrder.setStatus(4);
++            when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++            boolean result = orderService.updateById(testOrder);
++
++            assertTrue(result);
++            assertEquals(4, testOrder.getStatus());
++        }
++    }
++
++    @Nested
++    @DisplayName("璁㈠崟鍒犻櫎娴嬭瘯")
++    class DeleteOrderTests {
++
++        @Test
++        @DisplayName("姝ｅ父鍒犻櫎璁㈠崟 - 鍗曚釜鍒犻櫎鎴愬姛")
++        void deleteOrder_Success() {
++            when(orderMapper.deleteById(1L)).thenReturn(1);
++
++            boolean result = orderService.removeById(1L);
++
++            assertTrue(result);
++            verify(orderMapper, times(1)).deleteById(1L);
++        }
++
++        @Test
++        @DisplayName("鍒犻櫎涓嶅瓨鍦ㄧ殑璁㈠崟 - 杩斿洖澶辫触")
++        void deleteOrder_NotExist_ReturnsFalse() {
++            when(orderMapper.deleteById(999L)).thenReturn(0);
++
++            boolean result = orderService.removeById(999L);
++
++            assertFalse(result);
++            verify(orderMapper, times(1)).deleteById(999L);
++        }
++
++        @Test
++        @DisplayName("鎵归噺鍒犻櫎璁㈠崟 - 鎴愬姛鍒犻櫎澶氫釜")
++        void deleteOrders_Batch_Success() {
++            List<Long> ids = Arrays.asList(1L, 2L, 3L);
++            when(orderMapper.deleteBatchIds(ids)).thenReturn(3);
++
++            boolean result = orderService.removeByIds(ids);
++
++            assertTrue(result);
++            verify(orderMapper, times(1)).deleteBatchIds(ids);
++        }
++
++        @Test
++        @DisplayName("鎵归噺鍒犻櫎璁㈠崟 - 閮ㄥ垎涓嶅瓨鍦?)
++        void deleteOrders_Batch_PartialNotExist() {
++            List<Long> ids = Arrays.asList(1L, 2L, 999L);
++            when(orderMapper.deleteBatchIds(ids)).thenReturn(2);
++
++            boolean result = orderService.removeByIds(ids);
++
++            assertFalse(result);
++            verify(orderMapper, times(1)).deleteBatchIds(ids);
++        }
++
++        @Test
++        @DisplayName("鎵归噺鍒犻櫎璁㈠崟 - 绌哄垪琛?)
++        void deleteOrders_Batch_EmptyList() {
++            List<Long> ids = new ArrayList<>();
++            when(orderMapper.deleteBatchIds(ids)).thenReturn(0);
++
++            boolean result = orderService.removeByIds(ids);
++
++            assertFalse(result);
++        }
++    }
++
++    @Nested
++    @DisplayName("鏌ヨ鎵€鏈夎鍗曟祴璇?)
++    class ListOrdersTests {
++
++        @Test
++        @DisplayName("鏌ヨ鎵€鏈夎鍗?- 杩斿洖鍒楄〃")
++        void listAll_Success() {
++            Order order2 = new Order();
++            order2.setId(2L);
++            order2.setOrderNo("ORD202401010002");
++
++            when(orderMapper.selectList(any(LambdaQueryWrapper.class)))
++                    .thenReturn(Arrays.asList(testOrder, order2));
++
++            List<Order> result = orderService.list();
++
++            assertNotNull(result);
++            assertEquals(2, result.size());
++            verify(orderMapper, times(1)).selectList(any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鏌ヨ鎵€鏈夎鍗?- 绌哄垪琛?)
++        void listAll_Empty() {
++            when(orderMapper.selectList(any(LambdaQueryWrapper.class)))
++                    .thenReturn(new ArrayList<>());
++
++            List<Order> result = orderService.list();
++
++            assertNotNull(result);
++            assertTrue(result.isEmpty());
++        }
++    }
++}
+diff --git a/backend/src/test/java/com/labelease/usermanagement/service/impl/UserServiceImplTest.java b/backend/src/test/java/com/labelease/usermanagement/service/impl/UserServiceImplTest.java
+new file mode 100644
+index 0000000..6d169f2
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/service/impl/UserServiceImplTest.java
+@@ -0,0 +1,373 @@
++package com.labelease.usermanagement.service.impl;
++
++import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
++import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.labelease.usermanagement.entity.User;
++import com.labelease.usermanagement.mapper.UserMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Nested;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.Mockito.*;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("UserService 鍗曞厓娴嬭瘯")
++class UserServiceImplTest {
++
++    @Mock
++    private UserMapper userMapper;
++
++    @InjectMocks
++    private UserServiceImpl userService;
++
++    private User testUser;
++
++    @BeforeEach
++    void setUp() {
++        testUser = new User();
++        testUser.setId(1L);
++        testUser.setUsername("testuser");
++        testUser.setPassword("encodedPassword");
++        testUser.setRealName("娴嬭瘯鐢ㄦ埛");
++        testUser.setEmail("test@example.com");
++        testUser.setPhone("13800138000");
++        testUser.setStatus(1);
++        testUser.setDeleted(0);
++        testUser.setCreateTime(LocalDateTime.now());
++        testUser.setUpdateTime(LocalDateTime.now());
++    }
++
++    @Nested
++    @DisplayName("鐢ㄦ埛鏂板娴嬭瘯")
++    class SaveUserTests {
++
++        @Test
++        @DisplayName("姝ｅ父鏂板鐢ㄦ埛 - 鎴愬姛淇濆瓨")
++        void saveUser_Success() {
++            when(userMapper.insert(any(User.class))).thenReturn(1);
++
++            boolean result = userService.save(testUser);
++
++            assertTrue(result);
++            verify(userMapper, times(1)).insert(any(User.class));
++        }
++
++        @Test
++        @DisplayName("鏂板鐢ㄦ埛 - 鐢ㄦ埛鍚嶅凡瀛樺湪鏃跺簲鎶涘嚭寮傚父")
++        void saveUser_DuplicateUsername_ThrowsException() {
++            when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
++
++            User newUser = new User();
++            newUser.setUsername("testuser");
++            newUser.setPassword("newPassword");
++
++            when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
++
++            assertDoesNotThrow(() -> {
++                User existingUser = userService.getByUsername("testuser");
++                assertNotNull(existingUser);
++                assertEquals("testuser", existingUser.getUsername());
++            });
++        }
++    }
++
++    @Nested
++    @DisplayName("鐢ㄦ埛鏇存柊娴嬭瘯")
++    class UpdateUserTests {
++
++        @Test
++        @DisplayName("姝ｅ父鏇存柊鐢ㄦ埛 - 鎴愬姛鏇存柊")
++        void updateUser_Success() {
++            testUser.setRealName("鏇存柊鍚庣殑鍚嶅瓧");
++            when(userMapper.updateById(any(User.class))).thenReturn(1);
++
++            boolean result = userService.updateById(testUser);
++
++            assertTrue(result);
++            verify(userMapper, times(1)).updateById(any(User.class));
++        }
++
++        @Test
++        @DisplayName("鏇存柊涓嶅瓨鍦ㄧ殑鐢ㄦ埛 - 杩斿洖澶辫触")
++        void updateUser_NotExist_ReturnsFalse() {
++            User nonExistentUser = new User();
++            nonExistentUser.setId(999L);
++            nonExistentUser.setUsername("nonexistent");
++
++            when(userMapper.updateById(any(User.class))).thenReturn(0);
++
++            boolean result = userService.updateById(nonExistentUser);
++
++            assertFalse(result);
++            verify(userMapper, times(1)).updateById(any(User.class));
++        }
++
++        @Test
++        @DisplayName("鏍规嵁ID鏇存柊鐢ㄦ埛 - 閮ㄥ垎瀛楁鏇存柊")
++        void updateUserById_Success() {
++            testUser.setEmail("newemail@example.com");
++            when(userMapper.updateById(any(User.class))).thenReturn(1);
++
++            boolean result = userService.updateById(testUser);
++
++            assertTrue(result);
++            assertEquals("newemail@example.com", testUser.getEmail());
++        }
++    }
++
++    @Nested
++    @DisplayName("鐢ㄦ埛鍒犻櫎娴嬭瘯")
++    class DeleteUserTests {
++
++        @Test
++        @DisplayName("姝ｅ父鍒犻櫎鐢ㄦ埛 - 鍗曚釜鍒犻櫎鎴愬姛")
++        void deleteUser_Success() {
++            when(userMapper.deleteById(1L)).thenReturn(1);
++
++            boolean result = userService.removeById(1L);
++
++            assertTrue(result);
++            verify(userMapper, times(1)).deleteById(1L);
++        }
++
++        @Test
++        @DisplayName("鍒犻櫎涓嶅瓨鍦ㄧ殑鐢ㄦ埛 - 杩斿洖澶辫触")
++        void deleteUser_NotExist_ReturnsFalse() {
++            when(userMapper.deleteById(999L)).thenReturn(0);
++
++            boolean result = userService.removeById(999L);
++
++            assertFalse(result);
++            verify(userMapper, times(1)).deleteById(999L);
++        }
++
++        @Test
++        @DisplayName("鎵归噺鍒犻櫎鐢ㄦ埛 - 鎴愬姛鍒犻櫎澶氫釜")
++        void deleteUsers_Batch_Success() {
++            List<Long> ids = Arrays.asList(1L, 2L, 3L);
++            when(userMapper.deleteBatchIds(ids)).thenReturn(3);
++
++            boolean result = userService.removeByIds(ids);
++
++            assertTrue(result);
++            verify(userMapper, times(1)).deleteBatchIds(ids);
++        }
++
++        @Test
++        @DisplayName("鎵归噺鍒犻櫎鐢ㄦ埛 - 閮ㄥ垎涓嶅瓨鍦?)
++        void deleteUsers_Batch_PartialNotExist() {
++            List<Long> ids = Arrays.asList(1L, 2L, 999L);
++            when(userMapper.deleteBatchIds(ids)).thenReturn(2);
++
++            boolean result = userService.removeByIds(ids);
++
++            assertFalse(result);
++            verify(userMapper, times(1)).deleteBatchIds(ids);
++        }
++
++        @Test
++        @DisplayName("鎵归噺鍒犻櫎鐢ㄦ埛 - 绌哄垪琛?)
++        void deleteUsers_Batch_EmptyList() {
++            List<Long> ids = new ArrayList<>();
++            when(userMapper.deleteBatchIds(ids)).thenReturn(0);
++
++            boolean result = userService.removeByIds(ids);
++
++            assertFalse(result);
++        }
++    }
++
++    @Nested
++    @DisplayName("鍒嗛〉鏌ヨ娴嬭瘯")
++    class PageQueryTests {
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ - 涓嶅甫鍏抽敭瀛?)
++        void pageUsers_WithoutKeyword() {
++            Page<User> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testUser));
++            mockPage.setTotal(1);
++
++            when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<User> result = userService.pageUsers(1, 10, null);
++
++            assertNotNull(result);
++            assertEquals(1, result.getTotal());
++            assertEquals(1, result.getRecords().size());
++            verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ - 甯﹀叧閿瓧鎼滅储")
++        void pageUsers_WithKeyword() {
++            Page<User> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testUser));
++            mockPage.setTotal(1);
++
++            when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<User> result = userService.pageUsers(1, 10, "test");
++
++            assertNotNull(result);
++            assertEquals(1, result.getTotal());
++            verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ - 绌哄瓧绗︿覆鍏抽敭瀛楃瓑鍚屼簬鏃犲叧閿瓧")
++        void pageUsers_EmptyKeyword() {
++            Page<User> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testUser));
++            mockPage.setTotal(1);
++
++            when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<User> result = userService.pageUsers(1, 10, "");
++
++            assertNotNull(result);
++            verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ - 绌虹櫧瀛楃鍏抽敭瀛?)
++        void pageUsers_BlankKeyword() {
++            Page<User> mockPage = new Page<>(1, 10);
++            mockPage.setRecords(Arrays.asList(testUser));
++            mockPage.setTotal(1);
++
++            when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<User> result = userService.pageUsers(1, 10, "   ");
++
++            assertNotNull(result);
++            verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鍒嗛〉鏌ヨ - 绗簩椤垫暟鎹?)
++        void pageUsers_SecondPage() {
++            Page<User> mockPage = new Page<>(2, 10);
++            mockPage.setRecords(new ArrayList<>());
++            mockPage.setTotal(15);
++
++            when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
++                    .thenReturn(mockPage);
++
++            Page<User> result = userService.pageUsers(2, 10, null);
++
++            assertNotNull(result);
++            assertEquals(15, result.getTotal());
++            assertEquals(2, result.getCurrent());
++            assertTrue(result.getRecords().isEmpty());
++        }
++    }
++
++    @Nested
++    @DisplayName("鏍规嵁鐢ㄦ埛鍚嶆煡璇㈡祴璇?)
++    class GetByUsernameTests {
++
++        @Test
++        @DisplayName("鏍规嵁鐢ㄦ埛鍚嶆煡璇?- 鐢ㄦ埛瀛樺湪")
++        void getByUsername_UserExists() {
++            when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
++
++            User result = userService.getByUsername("testuser");
++
++            assertNotNull(result);
++            assertEquals("testuser", result.getUsername());
++            assertEquals("娴嬭瘯鐢ㄦ埛", result.getRealName());
++            verify(userMapper, times(1)).selectByUsername("testuser");
++        }
++
++        @Test
++        @DisplayName("鏍规嵁鐢ㄦ埛鍚嶆煡璇?- 鐢ㄦ埛涓嶅瓨鍦?)
++        void getByUsername_UserNotExists() {
++            when(userMapper.selectByUsername("nonexistent")).thenReturn(null);
++
++            User result = userService.getByUsername("nonexistent");
++
++            assertNull(result);
++            verify(userMapper, times(1)).selectByUsername("nonexistent");
++        }
++    }
++
++    @Nested
++    @DisplayName("鏍规嵁ID鏌ヨ娴嬭瘯")
++    class GetByIdTests {
++
++        @Test
++        @DisplayName("鏍规嵁ID鏌ヨ - 鐢ㄦ埛瀛樺湪")
++        void getById_UserExists() {
++            when(userMapper.selectById(1L)).thenReturn(testUser);
++
++            User result = userService.getById(1L);
++
++            assertNotNull(result);
++            assertEquals(1L, result.getId());
++            verify(userMapper, times(1)).selectById(1L);
++        }
++
++        @Test
++        @DisplayName("鏍规嵁ID鏌ヨ - 鐢ㄦ埛涓嶅瓨鍦?)
++        void getById_UserNotExists() {
++            when(userMapper.selectById(999L)).thenReturn(null);
++
++            User result = userService.getById(999L);
++
++            assertNull(result);
++            verify(userMapper, times(1)).selectById(999L);
++        }
++    }
++
++    @Nested
++    @DisplayName("鏌ヨ鎵€鏈夌敤鎴锋祴璇?)
++    class ListUsersTests {
++
++        @Test
++        @DisplayName("鏌ヨ鎵€鏈夌敤鎴?- 杩斿洖鍒楄〃")
++        void listAll_Success() {
++            User user2 = new User();
++            user2.setId(2L);
++            user2.setUsername("user2");
++
++            when(userMapper.selectList(any(LambdaQueryWrapper.class)))
++                    .thenReturn(Arrays.asList(testUser, user2));
++
++            List<User> result = userService.list();
++
++            assertNotNull(result);
++            assertEquals(2, result.size());
++            verify(userMapper, times(1)).selectList(any(LambdaQueryWrapper.class));
++        }
++
++        @Test
++        @DisplayName("鏌ヨ鎵€鏈夌敤鎴?- 绌哄垪琛?)
++        void listAll_Empty() {
++            when(userMapper.selectList(any(LambdaQueryWrapper.class)))
++                    .thenReturn(new ArrayList<>());
++
++            List<User> result = userService.list();
++
++            assertNotNull(result);
++            assertTrue(result.isEmpty());
++        }
++    }
++}
