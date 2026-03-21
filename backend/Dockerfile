@@ -7,11 +7,13 @@ COPY settings.xml /root/.m2/settings.xml
 
 # 先复制 pom.xml 利用 Docker 缓存下载依赖
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn dependency:go-offline -B
 
 # 复制源码并构建
 COPY src ./src
-RUN mvn package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn package -DskipTests -B
 
 # ---- Runtime Stage ----
 FROM eclipse-temurin:17-jre
@@ -25,5 +27,9 @@ ENV JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
 COPY --from=builder /app/target/*.jar app.jar
 
 EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-Dfile.encoding=UTF-8", "-jar", "app.jar"]
