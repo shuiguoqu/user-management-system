@@ -1,0 +1,997 @@
+﻿diff --git a/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java b/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java
+new file mode 100644
+index 0000000..0fc2f32
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java
+@@ -0,0 +1,99 @@
++package com.labelease.usermanagement.controller;
++
++import com.labelease.usermanagement.common.Result;
++import com.labelease.usermanagement.mapper.OrderMapper;
++import com.labelease.usermanagement.mapper.UserMapper;
++import io.swagger.v3.oas.annotations.Operation;
++import io.swagger.v3.oas.annotations.tags.Tag;
++import lombok.RequiredArgsConstructor;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
++
++import java.math.BigDecimal;
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++import java.time.LocalTime;
++import java.time.format.DateTimeFormatter;
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++/**
++ * 缁熻鏁版嵁鎺у埗鍣?+ */
++@Tag(name = "缁熻绠＄悊", description = "浠〃鐩樼粺璁℃暟鎹帴鍙?)
++@RestController
++@RequestMapping("/api/statistics")
++@RequiredArgsConstructor
++public class StatisticsController {
++
++    private final UserMapper userMapper;
++    private final OrderMapper orderMapper;
++
++    @Operation(summary = "鑾峰彇浠〃鐩樼粺璁℃暟鎹?)
++    @GetMapping("/dashboard")
++    public Result<Map<String, Object>> getDashboardStats() {
++        Map<String, Object> result = new HashMap<>();
++
++        // 鐢ㄦ埛鎬绘暟
++        long userCount = userMapper.selectCount(null);
++        result.put("totalUsers", userCount);
++
++        // 鏈湀鏂板鐢ㄦ埛鏁?+        LocalDateTime monthStart = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIN);
++        long newUsersThisMonth = userMapper.selectCount(
++                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.labelease.usermanagement.entity.User>()
++                        .ge(com.labelease.usermanagement.entity.User::getCreateTime, monthStart)
++        );
++        result.put("newUsersThisMonth", newUsersThisMonth);
++
++        // 璁㈠崟鎬绘暟
++        long orderCount = orderMapper.selectCount(null);
++        result.put("totalOrders", orderCount);
++
++        // 鎵€鏈夎鍗曟€婚噾棰?+        BigDecimal totalAmount = orderMapper.selectList(null).stream()
++                .map(com.labelease.usermanagement.entity.Order::getAmount)
++                .reduce(BigDecimal.ZERO, BigDecimal::add);
++        result.put("totalAmount", totalAmount);
++
++        return Result.success(result);
++    }
++
++    @Operation(summary = "鑾峰彇鏈€杩?澶╄秼鍔挎暟鎹?)
++    @GetMapping("/trend")
++    public Result<List<Map<String, Object>>> getTrendData() {
++        List<Map<String, Object>> result = new ArrayList<>();
++        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
++
++        for (int i = 6; i >= 0; i--) {
++            LocalDate date = LocalDate.now().minusDays(i);
++            LocalDateTime startOfDay = date.atStartOfDay();
++            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
++
++            // 褰撳ぉ鏂板鐢ㄦ埛鏁?+            long newUsers = userMapper.selectCount(
++                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.labelease.usermanagement.entity.User>()
++                            .ge(com.labelease.usermanagement.entity.User::getCreateTime, startOfDay)
++                            .le(com.labelease.usermanagement.entity.User::getCreateTime, endOfDay)
++            );
++
++            // 褰撳ぉ鏂板璁㈠崟鏁?+            long newOrders = orderMapper.selectCount(
++                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.labelease.usermanagement.entity.Order>()
++                            .ge(com.labelease.usermanagement.entity.Order::getCreateTime, startOfDay)
++                            .le(com.labelease.usermanagement.entity.Order::getCreateTime, endOfDay)
++            );
++
++            Map<String, Object> dayData = new HashMap<>();
++            dayData.put("date", date.format(formatter));
++            dayData.put("newUsers", newUsers);
++            dayData.put("newOrders", newOrders);
++            result.add(dayData);
++        }
++
++        return Result.success(result);
++    }
++}
+\ No newline at end of file
+diff --git a/backend/src/main/resources/db/init.sql b/backend/src/main/resources/db/init.sql
+index 98d3229..69524c0 100644
+--- a/backend/src/main/resources/db/init.sql
++++ b/backend/src/main/resources/db/init.sql
+@@ -69,3 +69,39 @@ INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`
+ ('ORD20260009', 5, '渚挎惡寮忓挅鍟＄爺纾ㄥ櫒',      329.00, 0),
+ ('ORD20260010', 1, '澶╃劧涔宠兌鏋曞ご',         268.00, 2)
+ ON DUPLICATE KEY UPDATE `order_no` = VALUES(`order_no`);
++
++-- 鏂板鏇村娴嬭瘯鐢ㄦ埛
++INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('user001', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛001', 'user001@example.com', '13800000101', 1, DATE_SUB(NOW(), INTERVAL 6 DAY)),
++('user002', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛002', 'user002@example.com', '13800000102', 1, DATE_SUB(NOW(), INTERVAL 6 DAY)),
++('user003', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛003', 'user003@example.com', '13800000103', 1, DATE_SUB(NOW(), INTERVAL 5 DAY)),
++('user004', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛004', 'user004@example.com', '13800000104', 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
++('user005', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛005', 'user005@example.com', '13800000105', 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
++('user006', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛006', 'user006@example.com', '13800000106', 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
++('user007', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛007', 'user007@example.com', '13800000107', 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
++('user008', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛008', 'user008@example.com', '13800000108', 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
++('user009', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛009', 'user009@example.com', '13800000109', 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
++('user010', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛010', 'user010@example.com', '13800000110', 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
++('user011', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛011', 'user011@example.com', '13800000111', 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
++('user012', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '鐢ㄦ埛012', 'user012@example.com', '13800000112', 1, NOW())
++ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
++
++-- 鏂板鏇村娴嬭瘯璁㈠崟
++INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('ORD20260011', 6, '鏈烘閿洏', 299.00, 3, DATE_SUB(NOW(), INTERVAL 6 DAY)),
++('ORD20260012', 7, '鏃犵嚎榧犳爣', 129.00, 1, DATE_SUB(NOW(), INTERVAL 6 DAY)),
++('ORD20260013', 6, '鏄剧ず鍣ㄦ敮鏋?, 199.00, 2, DATE_SUB(NOW(), INTERVAL 6 DAY)),
++('ORD20260014', 8, '绗旇鏈數鑴戝寘', 89.00, 3, DATE_SUB(NOW(), INTERVAL 5 DAY)),
++('ORD20260015', 9, 'USB鎵╁睍鍧?, 159.00, 3, DATE_SUB(NOW(), INTERVAL 5 DAY)),
++('ORD20260016', 7, '鐢电珵妞?, 899.00, 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
++('ORD20260017', 10, '骞虫澘鐢佃剳淇濇姢濂?, 49.00, 3, DATE_SUB(NOW(), INTERVAL 4 DAY)),
++('ORD20260018', 8, '钃濈墮闊崇', 249.00, 2, DATE_SUB(NOW(), INTERVAL 4 DAY)),
++('ORD20260019', 11, '鏅鸿兘鎵嬭〃', 599.00, 3, DATE_SUB(NOW(), INTERVAL 3 DAY)),
++('ORD20260020', 9, '绉诲姩鐢垫簮', 79.00, 3, DATE_SUB(NOW(), INTERVAL 3 DAY)),
++('ORD20260021', 12, '钃濈墮鑰虫満', 199.00, 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
++('ORD20260022', 10, '鎵嬫満澹?, 29.00, 3, DATE_SUB(NOW(), INTERVAL 2 DAY)),
++('ORD20260023', 11, '鏁版嵁绾垮瑁?, 39.00, 3, DATE_SUB(NOW(), INTERVAL 1 DAY)),
++('ORD20260024', 12, '鎵嬫満鏀灦', 19.00, 3, DATE_SUB(NOW(), INTERVAL 1 DAY)),
++('ORD20260025', 6, '閿洏娓呮磥濂楄', 25.00, 3, NOW()),
++('ORD20260026', 8, '绗旇鏈暎鐑櫒', 89.00, 1, NOW())
++ON DUPLICATE KEY UPDATE `order_no` = VALUES(`order_no`);
+diff --git a/frontend/package.json b/frontend/package.json
+index ce4ca50..6be080c 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -11,21 +11,22 @@
+     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+   },
+   "dependencies": {
+-    "vue": "^3.4.21",
+-    "vue-router": "^4.3.0",
+-    "element-plus": "^2.7.2",
+-    "axios": "^1.6.8",
+     "@element-plus/icons-vue": "^2.3.1",
+-    "pinia": "^2.1.7"
++    "axios": "^1.6.8",
++    "echarts": "^6.0.0",
++    "element-plus": "^2.7.2",
++    "pinia": "^2.1.7",
++    "vue": "^3.4.21",
++    "vue-router": "^4.3.0"
+   },
+   "devDependencies": {
++    "@typescript-eslint/eslint-plugin": "^7.3.0",
++    "@typescript-eslint/parser": "^7.3.0",
+     "@vitejs/plugin-vue": "^5.0.4",
+-    "typescript": "~5.4.0",
+-    "vite": "^5.2.0",
+-    "vue-tsc": "^2.0.6",
+     "eslint": "^8.57.0",
+     "eslint-plugin-vue": "^9.24.0",
+-    "@typescript-eslint/parser": "^7.3.0",
+-    "@typescript-eslint/eslint-plugin": "^7.3.0"
++    "typescript": "~5.4.0",
++    "vite": "^5.2.0",
++    "vue-tsc": "^2.0.6"
+   }
+ }
+diff --git a/frontend/src/api/statistics.ts b/frontend/src/api/statistics.ts
+new file mode 100644
+index 0000000..da080d7
+--- /dev/null
++++ b/frontend/src/api/statistics.ts
+@@ -0,0 +1,21 @@
++import request from './request'
++
++/**
++ * 缁熻鏁版嵁 API 鎺ュ彛
++ */
++
++// 鑾峰彇浠〃鐩樼粺璁℃暟鎹?+export const getDashboardStats = () => {
++  return request({
++    url: '/statistics/dashboard',
++    method: 'get'
++  })
++}
++
++// 鑾峰彇鏈€杩?澶╄秼鍔挎暟鎹?+export const getTrendData = () => {
++  return request({
++    url: '/statistics/trend',
++    method: 'get'
++  })
++}
+\ No newline at end of file
+diff --git a/frontend/src/layouts/MainLayout.vue b/frontend/src/layouts/MainLayout.vue
+new file mode 100644
+index 0000000..1f96af7
+--- /dev/null
++++ b/frontend/src/layouts/MainLayout.vue
+@@ -0,0 +1,279 @@
++<template>
++  <div class="layout-container">
++    <!-- 渚ц竟鏍?-->
++    <el-aside class="sidebar" :class="{ 'is-collapsed': isCollapsed }">
++      <div class="sidebar-header">
++        <el-icon class="logo-icon"><DataLine /></el-icon>
++        <span v-if="!isCollapsed" class="logo-text">绠＄悊绯荤粺</span>
++      </div>
++      <el-menu
++        :default-active="activeMenu"
++        class="sidebar-menu"
++        :collapse="isCollapsed"
++        router
++      >
++        <el-menu-item index="/dashboard">
++          <el-icon><DataLine /></el-icon>
++          <template #title>浠〃鐩?/template>
++        </el-menu-item>
++        <el-menu-item index="/users">
++          <el-icon><User /></el-icon>
++          <template #title>鐢ㄦ埛绠＄悊</template>
++        </el-menu-item>
++      </el-menu>
++      <div class="sidebar-footer">
++        <el-button
++          :icon="isCollapsed ? 'Expand' : 'Fold'"
++          @click="isCollapsed = !isCollapsed"
++          circle
++          size="small"
++        />
++      </div>
++    </el-aside>
++
++    <!-- 涓诲唴瀹瑰尯 -->
++    <el-container class="main-container">
++      <!-- 椤堕儴瀵艰埅鏍?-->
++      <el-header class="header">
++        <div class="header-left">
++          <h2 class="page-title">{{ currentPageTitle }}</h2>
++        </div>
++        <div class="header-right">
++          <el-dropdown @command="handleDropdownCommand">
++            <div class="user-info">
++              <el-icon class="user-avatar"><User /></el-icon>
++              <span class="username">{{ realName }}</span>
++              <el-icon class="arrow-icon"><CaretBottom /></el-icon>
++            </div>
++            <template #dropdown>
++              <el-dropdown-menu>
++                <el-dropdown-item command="profile">涓汉淇℃伅</el-dropdown-item>
++                <el-dropdown-item command="logout" divided>閫€鍑虹櫥褰?/el-dropdown-item>
++              </el-dropdown-menu>
++            </template>
++          </el-dropdown>
++        </div>
++      </el-header>
++
++      <!-- 椤甸潰鍐呭 -->
++      <el-main class="content-area">
++        <router-view />
++      </el-main>
++    </el-container>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref, computed } from 'vue'
++import { useRouter, useRoute } from 'vue-router'
++import { ElMessage, ElMessageBox } from 'element-plus'
++import {
++  DataLine,
++  User,
++  Fold,
++  Expand,
++  CaretBottom
++} from '@element-plus/icons-vue'
++
++const router = useRouter()
++const route = useRoute()
++
++const isCollapsed = ref(false)
++const realName = ref(localStorage.getItem('realName') || '绠＄悊鍛?)
++
++// 褰撳墠婵€娲荤殑鑿滃崟
++const activeMenu = computed(() => {
++  return route.path
++})
++
++// 褰撳墠椤甸潰鏍囬
++const currentPageTitle = computed(() => {
++  const path = route.path
++  if (path === '/dashboard' || path === '/') return '鏁版嵁浠〃鐩?
++  if (path.startsWith('/users')) return '鐢ㄦ埛绠＄悊'
++  return '绠＄悊绯荤粺'
++})
++
++// 澶勭悊涓嬫媺鑿滃崟鍛戒护
++const handleDropdownCommand = async (command: string) => {
++  if (command === 'logout') {
++    try {
++      await ElMessageBox.confirm('纭畾瑕侀€€鍑虹櫥褰曞悧锛?, '鎻愮ず', {
++        confirmButtonText: '纭畾',
++        cancelButtonText: '鍙栨秷',
++        type: 'warning'
++      })
++      localStorage.removeItem('token')
++      localStorage.removeItem('username')
++      localStorage.removeItem('realName')
++      ElMessage.success('閫€鍑烘垚鍔?)
++      router.push('/login')
++    } catch {
++      // 鐢ㄦ埛鍙栨秷鎿嶄綔
++    }
++  } else if (command === 'profile') {
++    ElMessage.info('涓汉淇℃伅鍔熻兘寮€鍙戜腑...')
++  }
++}
++</script>
++
++<style scoped>
++.layout-container {
++  display: flex;
++  height: 100vh;
++  overflow: hidden;
++}
++
++/* 渚ц竟鏍忔牱寮?*/
++.sidebar {
++  width: 240px;
++  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
++  display: flex;
++  flex-direction: column;
++  transition: width 0.3s ease;
++  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
++}
++
++.sidebar.is-collapsed {
++  width: 64px;
++}
++
++.sidebar-header {
++  display: flex;
++  align-items: center;
++  padding: 20px;
++  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
++}
++
++.logo-icon {
++  font-size: 28px;
++  color: #409eff;
++}
++
++.logo-text {
++  margin-left: 12px;
++  font-size: 18px;
++  font-weight: 600;
++  color: #fff;
++  white-space: nowrap;
++}
++
++.sidebar-menu {
++  flex: 1;
++  border-right: none;
++  background: transparent;
++  padding-top: 12px;
++}
++
++.sidebar-menu :deep(.el-menu-item) {
++  height: 50px;
++  line-height: 50px;
++  margin: 4px 12px;
++  border-radius: 8px;
++  color: rgba(255, 255, 255, 0.7);
++  transition: all 0.2s;
++}
++
++.sidebar-menu :deep(.el-menu-item:hover) {
++  background-color: rgba(64, 158, 255, 0.2);
++  color: #fff;
++}
++
++.sidebar-menu :deep(.el-menu-item.is-active) {
++  background-color: #409eff;
++  color: #fff;
++}
++
++.sidebar-menu :deep(.el-icon) {
++  font-size: 20px;
++}
++
++.sidebar-footer {
++  padding: 16px;
++  border-top: 1px solid rgba(255, 255, 255, 0.1);
++  display: flex;
++  justify-content: center;
++}
++
++.sidebar-footer :deep(.el-button) {
++  background: rgba(255, 255, 255, 0.1);
++  border: none;
++  color: rgba(255, 255, 255, 0.7);
++}
++
++.sidebar-footer :deep(.el-button:hover) {
++  background: rgba(255, 255, 255, 0.2);
++  color: #fff;
++}
++
++/* 涓诲唴瀹瑰尯 */
++.main-container {
++  flex: 1;
++  display: flex;
++  flex-direction: column;
++  overflow: hidden;
++  background-color: #f5f7fa;
++}
++
++/* 椤堕儴瀵艰埅鏍?*/
++.header {
++  height: 64px;
++  background: #fff;
++  border-bottom: 1px solid #e5e7eb;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding: 0 24px;
++  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
++}
++
++.page-title {
++  font-size: 18px;
++  font-weight: 600;
++  color: #1f2937;
++  margin: 0;
++}
++
++.header-right {
++  display: flex;
++  align-items: center;
++}
++
++.user-info {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  padding: 8px 12px;
++  border-radius: 8px;
++  cursor: pointer;
++  transition: background-color 0.2s;
++}
++
++.user-info:hover {
++  background-color: #f3f4f6;
++}
++
++.user-avatar {
++  font-size: 20px;
++  color: #6b7280;
++}
++
++.username {
++  font-size: 14px;
++  color: #374151;
++  font-weight: 500;
++}
++
++.arrow-icon {
++  font-size: 12px;
++  color: #9ca3af;
++}
++
++/* 鍐呭鍖哄煙 */
++.content-area {
++  flex: 1;
++  overflow: auto;
++  padding: 0;
++  background-color: #f5f7fa;
++}
++</style>
+\ No newline at end of file
+diff --git a/frontend/src/pages/DashboardPage.vue b/frontend/src/pages/DashboardPage.vue
+new file mode 100644
+index 0000000..a1b7b41
+--- /dev/null
++++ b/frontend/src/pages/DashboardPage.vue
+@@ -0,0 +1,412 @@
++<template>
++  <div class="dashboard-container">
++    <div class="page-header">
++      <h1>鏁版嵁浠〃鐩?/h1>
++      <p>缁熸徑鍏ㄥ眬鏁版嵁锛屽疄鏃舵帉鎻′笟鍔″姩鎬?/p>
++    </div>
++
++    <!-- 缁熻鍗＄墖 -->
++    <div class="stats-cards">
++      <el-card class="stats-card" shadow="hover">
++        <div class="card-content">
++          <div class="card-icon user-icon">
++            <el-icon><User /></el-icon>
++          </div>
++          <div class="card-info">
++            <div class="card-value">{{ formatNumber(dashboardStats.totalUsers) }}</div>
++            <div class="card-label">鐢ㄦ埛鎬绘暟</div>
++          </div>
++        </div>
++      </el-card>
++
++      <el-card class="stats-card" shadow="hover">
++        <div class="card-content">
++          <div class="card-icon trend-icon">
++            <el-icon><TrendCharts /></el-icon>
++          </div>
++          <div class="card-info">
++            <div class="card-value">{{ formatNumber(dashboardStats.newUsersThisMonth) }}</div>
++            <div class="card-label">鏈湀鏂板</div>
++          </div>
++        </div>
++      </el-card>
++
++      <el-card class="stats-card" shadow="hover">
++        <div class="card-content">
++          <div class="card-icon order-icon">
++            <el-icon><Document /></el-icon>
++          </div>
++          <div class="card-info">
++            <div class="card-value">{{ formatNumber(dashboardStats.totalOrders) }}</div>
++            <div class="card-label">璁㈠崟鎬绘暟</div>
++          </div>
++        </div>
++      </el-card>
++
++      <el-card class="stats-card" shadow="hover">
++        <div class="card-content">
++          <div class="card-icon money-icon">
++            <el-icon><Money /></el-icon>
++          </div>
++          <div class="card-info">
++            <div class="card-value">楼{{ formatAmount(dashboardStats.totalAmount) }}</div>
++            <div class="card-label">鎬婚噾棰?/div>
++          </div>
++        </div>
++      </el-card>
++    </div>
++
++    <!-- 瓒嬪娍鍥?-->
++    <el-card class="chart-card" shadow="hover">
++      <template #header>
++        <div class="chart-header">
++          <span>鏈€杩?澶╄秼鍔?/span>
++          <div class="chart-legend">
++            <span class="legend-item">
++              <span class="legend-dot user-dot"></span>
++              鏂板鐢ㄦ埛
++            </span>
++            <span class="legend-item">
++              <span class="legend-dot order-dot"></span>
++              鏂板璁㈠崟
++            </span>
++          </div>
++        </div>
++      </template>
++      <div ref="chartRef" class="chart-container"></div>
++    </el-card>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref, onMounted, onUnmounted } from 'vue'
++import * as echarts from 'echarts'
++import { getDashboardStats, getTrendData } from '@/api/statistics'
++import {
++  User,
++  TrendCharts,
++  Document,
++  Money
++} from '@element-plus/icons-vue'
++
++const chartRef = ref<HTMLElement | null>(null)
++let chartInstance: echarts.ECharts | null = null
++
++const dashboardStats = ref({
++  totalUsers: 0,
++  newUsersThisMonth: 0,
++  totalOrders: 0,
++  totalAmount: 0
++})
++
++// 鏍煎紡鍖栨暟瀛?+const formatNumber = (num: number) => {
++  return num.toLocaleString()
++}
++
++// 鏍煎紡鍖栭噾棰?+const formatAmount = (amount: number) => {
++  return Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
++}
++
++// 鍒濆鍖栧浘琛?+const initChart = (trendData: any[]) => {
++  if (!chartRef.value) return
++
++  chartInstance = echarts.init(chartRef.value)
++
++  const dates = trendData.map(item => item.date.replace(/^\d{4}-/, '')) // 鍙樉绀烘湀-鏃?+  const newUsers = trendData.map(item => item.newUsers)
++  const newOrders = trendData.map(item => item.newOrders)
++
++  const option: echarts.EChartsOption = {
++    tooltip: {
++      trigger: 'axis',
++      backgroundColor: 'rgba(255, 255, 255, 0.95)',
++      borderColor: '#e5e7eb',
++      borderWidth: 1,
++      textStyle: {
++        color: '#333'
++      },
++      formatter: (params: any) => {
++        let result = `<div style="font-weight: bold; margin-bottom: 8px;">${params[0].axisValue}</div>`
++        params.forEach((item: any) => {
++          const marker = `<span style="display:inline-block;margin-right:8px;border-radius:50%;width:10px;height:10px;background-color:${item.color};"></span>`
++          result += `<div style="margin: 4px 0;">${marker}${item.seriesName}: <strong>${item.value}</strong></div>`
++        })
++        return result
++      }
++    },
++    grid: {
++      left: '3%',
++      right: '4%',
++      bottom: '3%',
++      top: '10%',
++      containLabel: true
++    },
++    xAxis: {
++      type: 'category',
++      boundaryGap: false,
++      data: dates,
++      axisLine: {
++        lineStyle: {
++          color: '#e5e7eb'
++        }
++      },
++      axisLabel: {
++        color: '#6b7280',
++        fontSize: 12
++      }
++    },
++    yAxis: {
++      type: 'value',
++      splitLine: {
++        lineStyle: {
++          color: '#f3f4f6',
++          type: 'dashed'
++        }
++      },
++      axisLine: {
++        show: false
++      },
++      axisTick: {
++        show: false
++      },
++      axisLabel: {
++        color: '#6b7280',
++        fontSize: 12
++      }
++    },
++    series: [
++      {
++        name: '鏂板鐢ㄦ埛',
++        type: 'line',
++        smooth: true,
++        symbol: 'circle',
++        symbolSize: 8,
++        showSymbol: true,
++        lineStyle: {
++          width: 3,
++          color: '#409eff'
++        },
++        itemStyle: {
++          color: '#409eff',
++          borderWidth: 2,
++          borderColor: '#fff'
++        },
++        areaStyle: {
++          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
++            { offset: 1, color: 'rgba(64, 158, 255, 0.02)' }
++          ])
++        },
++        data: newUsers
++      },
++      {
++        name: '鏂板璁㈠崟',
++        type: 'line',
++        smooth: true,
++        symbol: 'circle',
++        symbolSize: 8,
++        showSymbol: true,
++        lineStyle: {
++          width: 3,
++          color: '#67c23a'
++        },
++        itemStyle: {
++          color: '#67c23a',
++          borderWidth: 2,
++          borderColor: '#fff'
++        },
++        areaStyle: {
++          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++            { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
++            { offset: 1, color: 'rgba(103, 194, 58, 0.02)' }
++          ])
++        },
++        data: newOrders
++      }
++    ]
++  }
++
++  chartInstance.setOption(option)
++}
++
++// 鑾峰彇鏁版嵁
++const fetchData = async () => {
++  try {
++    // 鑾峰彇浠〃鐩樼粺璁?+    const statsRes: any = await getDashboardStats()
++    dashboardStats.value = statsRes.data
++
++    // 鑾峰彇瓒嬪娍鏁版嵁
++    const trendRes: any = await getTrendData()
++    initChart(trendRes.data)
++  } catch (error) {
++    console.error('鑾峰彇缁熻鏁版嵁澶辫触:', error)
++  }
++}
++
++// 绐楀彛澶у皬鍙樺寲鏃惰皟鏁村浘琛?+const handleResize = () => {
++  chartInstance?.resize()
++}
++
++onMounted(() => {
++  fetchData()
++  window.addEventListener('resize', handleResize)
++})
++
++onUnmounted(() => {
++  window.removeEventListener('resize', handleResize)
++  chartInstance?.dispose()
++})
++</script>
++
++<style scoped>
++.dashboard-container {
++  padding: var(--spacing-lg);
++  max-width: 1400px;
++  margin: 0 auto;
++}
++
++.page-header {
++  margin-bottom: var(--spacing-lg);
++}
++
++.page-header h1 {
++  font-size: 28px;
++  color: var(--text-primary);
++  margin-bottom: 4px;
++}
++
++.page-header p {
++  font-size: 14px;
++  color: var(--text-secondary);
++}
++
++.stats-cards {
++  display: grid;
++  grid-template-columns: repeat(4, 1fr);
++  gap: var(--spacing-lg);
++  margin-bottom: var(--spacing-lg);
++}
++
++.stats-card {
++  border-radius: var(--radius-lg);
++  overflow: hidden;
++}
++
++.card-content {
++  display: flex;
++  align-items: center;
++  gap: var(--spacing-md);
++}
++
++.card-icon {
++  width: 56px;
++  height: 56px;
++  border-radius: 12px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 24px;
++  color: #fff;
++}
++
++.user-icon {
++  background: linear-gradient(135deg, #409eff, #66b1ff);
++  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
++}
++
++.trend-icon {
++  background: linear-gradient(135deg, #e6a23c, #f0c78a);
++  box-shadow: 0 4px 12px rgba(230, 162, 60, 0.4);
++}
++
++.order-icon {
++  background: linear-gradient(135deg, #67c23a, #85ce61);
++  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.4);
++}
++
++.money-icon {
++  background: linear-gradient(135deg, #f56c6c, #f89898);
++  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.4);
++}
++
++.card-info {
++  flex: 1;
++}
++
++.card-value {
++  font-size: 32px;
++  font-weight: 700;
++  color: var(--text-primary);
++  line-height: 1.2;
++  margin-bottom: 4px;
++}
++
++.card-label {
++  font-size: 14px;
++  color: var(--text-secondary);
++}
++
++.chart-card {
++  border-radius: var(--radius-lg);
++}
++
++.chart-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.chart-legend {
++  display: flex;
++  gap: 20px;
++}
++
++.legend-item {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 13px;
++  color: var(--text-secondary);
++  font-weight: normal;
++}
++
++.legend-dot {
++  display: inline-block;
++  width: 10px;
++  height: 10px;
++  border-radius: 50%;
++}
++
++.user-dot {
++  background-color: #409eff;
++}
++
++.order-dot {
++  background-color: #67c23a;
++}
++
++.chart-container {
++  width: 100%;
++  height: 400px;
++  margin-top: var(--spacing-md);
++}
++
++@media (max-width: 1200px) {
++  .stats-cards {
++    grid-template-columns: repeat(2, 1fr);
++  }
++}
++
++@media (max-width: 640px) {
++  .stats-cards {
++    grid-template-columns: 1fr;
++  }
++}
++</style>
+\ No newline at end of file
+diff --git a/frontend/src/pages/LoginPage.vue b/frontend/src/pages/LoginPage.vue
+index 2166c33..679d639 100644
+--- a/frontend/src/pages/LoginPage.vue
++++ b/frontend/src/pages/LoginPage.vue
+@@ -82,7 +82,7 @@ const handleLogin = async () => {
+     localStorage.setItem('username', res.data.username)
+     localStorage.setItem('realName', res.data.realName)
+     ElMessage.success('鐧诲綍鎴愬姛')
+-    router.push('/users')
++    router.push('/dashboard')
+   } catch {
+     // 閿欒宸插湪鎷︽埅鍣ㄤ腑澶勭悊
+   } finally {
+diff --git a/frontend/src/router/index.ts b/frontend/src/router/index.ts
+index e56ea11..663ae9c 100644
+--- a/frontend/src/router/index.ts
++++ b/frontend/src/router/index.ts
+@@ -1,4 +1,5 @@
+ import { createRouter, createWebHistory } from 'vue-router'
++import MainLayout from '@/layouts/MainLayout.vue'
+ 
+ const router = createRouter({
+   history: createWebHistory(),
+@@ -11,25 +12,34 @@ const router = createRouter({
+     },
+     {
+       path: '/',
+-      redirect: '/users'
+-    },
+-    {
+-      path: '/users',
+-      name: 'UserList',
+-      component: () => import('@/pages/UserListPage.vue'),
+-      meta: { requiresAuth: true }
+-    },
+-    {
+-      path: '/users/create',
+-      name: 'UserCreate',
+-      component: () => import('@/pages/UserFormPage.vue'),
+-      meta: { requiresAuth: true }
+-    },
+-    {
+-      path: '/users/:id/edit',
+-      name: 'UserEdit',
+-      component: () => import('@/pages/UserFormPage.vue'),
+-      meta: { requiresAuth: true }
++      component: MainLayout,
++      redirect: '/dashboard',
++      children: [
++        {
++          path: 'dashboard',
++          name: 'Dashboard',
++          component: () => import('@/pages/DashboardPage.vue'),
++          meta: { requiresAuth: true }
++        },
++        {
++          path: 'users',
++          name: 'UserList',
++          component: () => import('@/pages/UserListPage.vue'),
++          meta: { requiresAuth: true }
++        },
++        {
++          path: 'users/create',
++          name: 'UserCreate',
++          component: () => import('@/pages/UserFormPage.vue'),
++          meta: { requiresAuth: true }
++        },
++        {
++          path: 'users/:id/edit',
++          name: 'UserEdit',
++          component: () => import('@/pages/UserFormPage.vue'),
++          meta: { requiresAuth: true }
++        }
++      ]
+     }
+   ]
+ })
+@@ -40,7 +50,7 @@ router.beforeEach((to, _from, next) => {
+   if (to.meta.requiresAuth && !token) {
+     next('/login')
+   } else if (to.path === '/login' && token) {
+-    next('/users')
++    next('/dashboard')
+   } else {
+     next()
+   }
+diff --git a/seed_diff.patch b/seed_diff.patch
+new file mode 100644
+index 0000000..627325b
+Binary files /dev/null and b/seed_diff.patch differ

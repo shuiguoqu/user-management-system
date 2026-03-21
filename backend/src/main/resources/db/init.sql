@@ -69,3 +69,39 @@ INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`
 ('ORD20260009', 5, '便携式咖啡研磨器',      329.00, 0),
 ('ORD20260010', 1, '天然乳胶枕头',         268.00, 2)
 ON DUPLICATE KEY UPDATE `order_no` = VALUES(`order_no`);
+
+-- 新增更多测试用户
+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
+('user001', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户001', 'user001@example.com', '13800000101', 1, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+('user002', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户002', 'user002@example.com', '13800000102', 1, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+('user003', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户003', 'user003@example.com', '13800000103', 1, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('user004', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户004', 'user004@example.com', '13800000104', 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+('user005', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户005', 'user005@example.com', '13800000105', 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+('user006', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户006', 'user006@example.com', '13800000106', 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+('user007', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户007', 'user007@example.com', '13800000107', 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+('user008', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户008', 'user008@example.com', '13800000108', 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('user009', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户009', 'user009@example.com', '13800000109', 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('user010', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户010', 'user010@example.com', '13800000110', 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+('user011', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户011', 'user011@example.com', '13800000111', 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+('user012', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '用户012', 'user012@example.com', '13800000112', 1, NOW())
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
+
+-- 新增更多测试订单
+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
+('ORD20260011', 6, '机械键盘', 299.00, 3, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+('ORD20260012', 7, '无线鼠标', 129.00, 1, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+('ORD20260013', 6, '显示器支架', 199.00, 2, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+('ORD20260014', 8, '笔记本电脑包', 89.00, 3, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('ORD20260015', 9, 'USB扩展坞', 159.00, 3, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('ORD20260016', 7, '电竞椅', 899.00, 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+('ORD20260017', 10, '平板电脑保护套', 49.00, 3, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+('ORD20260018', 8, '蓝牙音箱', 249.00, 2, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+('ORD20260019', 11, '智能手表', 599.00, 3, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+('ORD20260020', 9, '移动电源', 79.00, 3, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+('ORD20260021', 12, '蓝牙耳机', 199.00, 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('ORD20260022', 10, '手机壳', 29.00, 3, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('ORD20260023', 11, '数据线套装', 39.00, 3, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+('ORD20260024', 12, '手机支架', 19.00, 3, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+('ORD20260025', 6, '键盘清洁套装', 25.00, 3, NOW()),
+('ORD20260026', 8, '笔记本散热器', 89.00, 1, NOW())
+ON DUPLICATE KEY UPDATE `order_no` = VALUES(`order_no`);
