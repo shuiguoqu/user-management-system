@@ -1,0 +1,742 @@
+diff --git a/backend/pom.xml b/backend/pom.xml
+index ee055c4..0155f8d 100644
+--- a/backend/pom.xml
++++ b/backend/pom.xml
+@@ -112,6 +112,17 @@
+                     </excludes>
+                 </configuration>
+             </plugin>
++            <!-- Maven Surefire Plugin for running tests -->
++            <plugin>
++                <groupId>org.apache.maven.plugins</groupId>
++                <artifactId>maven-surefire-plugin</artifactId>
++                <version>3.2.5</version>
++                <configuration>
++                    <includes>
++                        <include>**/*Test.java</include>
++                    </includes>
++                </configuration>
++            </plugin>
+         </plugins>
+     </build>
+ 
+diff --git a/backend/src/test/java/com/labelease/usermanagement/common/JwtUtilTest.java b/backend/src/test/java/com/labelease/usermanagement/common/JwtUtilTest.java
+new file mode 100644
+index 0000000..b931c63
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/common/JwtUtilTest.java
+@@ -0,0 +1,91 @@
++package com.labelease.usermanagement.common;
++
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.test.util.ReflectionTestUtils;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++/**
++ * JwtUtil 鍗曞厓娴嬭瘯
++ */
++@ExtendWith(MockitoExtension.class)
++class JwtUtilTest {
++
++    @InjectMocks
++    private JwtUtil jwtUtil;
++
++    private String testSecret = "thisIsASecretKeyThatIsLongEnoughForTestingPurposes12345";
++    private long testExpiration = 3600000;
++
++    @BeforeEach
++    void setUp() {
++        ReflectionTestUtils.setField(jwtUtil, "secret", testSecret);
++        ReflectionTestUtils.setField(jwtUtil, "expiration", testExpiration);
++    }
++
++    @Test
++    void testGenerateToken() {
++        String username = "testuser";
++
++        String token = jwtUtil.generateToken(username);
++
++        assertNotNull(token);
++        assertFalse(token.isEmpty());
++    }
++
++    @Test
++    void testGetUsernameFromToken() {
++        String username = "testuser";
++        String token = jwtUtil.generateToken(username);
++
++        String extractedUsername = jwtUtil.getUsernameFromToken(token);
++
++        assertEquals(username, extractedUsername);
++    }
++
++    @Test
++    void testValidateToken_ValidToken() {
++        String username = "testuser";
++        String token = jwtUtil.generateToken(username);
++
++        boolean isValid = jwtUtil.validateToken(token);
++
++        assertTrue(isValid);
++    }
++
++    @Test
++    void testValidateToken_InvalidToken() {
++        String invalidToken = "invalid.token.here";
++
++        boolean isValid = jwtUtil.validateToken(invalidToken);
++
++        assertFalse(isValid);
++    }
++
++    @Test
++    void testTokenConsistency() {
++        String username = "testuser";
++        String token1 = jwtUtil.generateToken(username);
++        String extractedUsername = jwtUtil.getUsernameFromToken(token1);
++
++        assertEquals(username, extractedUsername);
++        assertTrue(jwtUtil.validateToken(token1));
++    }
++
++    @Test
++    void testDifferentUsersHaveDifferentTokens() {
++        String user1 = "user1";
++        String user2 = "user2";
++
++        String token1 = jwtUtil.generateToken(user1);
++        String token2 = jwtUtil.generateToken(user2);
++
++        assertNotEquals(token1, token2);
++        assertEquals(user1, jwtUtil.getUsernameFromToken(token1));
++        assertEquals(user2, jwtUtil.getUsernameFromToken(token2));
++    }
++}
+diff --git a/backend/src/test/java/com/labelease/usermanagement/controller/AuthControllerTest.java b/backend/src/test/java/com/labelease/usermanagement/controller/AuthControllerTest.java
+new file mode 100644
+index 0000000..d2c2b83
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/controller/AuthControllerTest.java
+@@ -0,0 +1,221 @@
++package com.labelease.usermanagement.controller;
++
++import com.labelease.usermanagement.common.JwtUtil;
++import com.labelease.usermanagement.common.Result;
++import com.labelease.usermanagement.entity.User;
++import com.labelease.usermanagement.service.UserService;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.security.crypto.password.PasswordEncoder;
++
++import java.util.HashMap;
++import java.util.Map;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.anyString;
++import static org.mockito.Mockito.*;
++
++/**
++ * AuthController 鍗曞厓娴嬭瘯 - 鐧诲綍閫昏緫娴嬭瘯
++ */
++@ExtendWith(MockitoExtension.class)
++class AuthControllerTest {
++
++    @Mock
++    private UserService userService;
++
++    @Mock
++    private JwtUtil jwtUtil;
++
++    @Mock
++    private PasswordEncoder passwordEncoder;
++
++    @InjectMocks
++    private AuthController authController;
++
++    @Test
++    void testLogin_Success() {
++        String username = "testuser";
++        String password = "password";
++        String encodedPassword = "$2a$10$encodedPasswordHash";
++        String mockToken = "mock.jwt.token";
++
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", username);
++        credentials.put("password", password);
++
++        User mockUser = new User();
++        mockUser.setId(1L);
++        mockUser.setUsername(username);
++        mockUser.setPassword(encodedPassword);
++        mockUser.setRealName("娴嬭瘯鐢ㄦ埛");
++        mockUser.setStatus(1);
++
++        when(userService.getByUsername(username)).thenReturn(mockUser);
++        when(passwordEncoder.matches(password, encodedPassword)).thenReturn(true);
++        when(jwtUtil.generateToken(username)).thenReturn(mockToken);
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(200, result.getCode());
++        assertEquals("鐧诲綍鎴愬姛", result.getMessage());
++        assertNotNull(result.getData());
++
++        verify(userService, times(1)).getByUsername(username);
++        verify(passwordEncoder, times(1)).matches(password, encodedPassword);
++        verify(jwtUtil, times(1)).generateToken(username);
++    }
++
++    @Test
++    void testLogin_UsernameNotFound() {
++        String username = "nonexistent";
++        String password = "password";
++
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", username);
++        credentials.put("password", password);
++
++        when(userService.getByUsername(username)).thenReturn(null);
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(401, result.getCode());
++        assertEquals("鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒", result.getMessage());
++
++        verify(userService, times(1)).getByUsername(username);
++        verify(passwordEncoder, never()).matches(anyString(), anyString());
++        verify(jwtUtil, never()).generateToken(anyString());
++    }
++
++    @Test
++    void testLogin_WrongPassword() {
++        String username = "testuser";
++        String password = "wrongpassword";
++        String encodedPassword = "$2a$10$encodedPasswordHash";
++
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", username);
++        credentials.put("password", password);
++
++        User mockUser = new User();
++        mockUser.setId(1L);
++        mockUser.setUsername(username);
++        mockUser.setPassword(encodedPassword);
++        mockUser.setStatus(1);
++
++        when(userService.getByUsername(username)).thenReturn(mockUser);
++        when(passwordEncoder.matches(password, encodedPassword)).thenReturn(false);
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(401, result.getCode());
++        assertEquals("鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒", result.getMessage());
++
++        verify(userService, times(1)).getByUsername(username);
++        verify(passwordEncoder, times(1)).matches(password, encodedPassword);
++        verify(jwtUtil, never()).generateToken(anyString());
++    }
++
++    @Test
++    void testLogin_UserDisabled() {
++        String username = "testuser";
++        String password = "password";
++        String encodedPassword = "$2a$10$encodedPasswordHash";
++
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", username);
++        credentials.put("password", password);
++
++        User mockUser = new User();
++        mockUser.setId(1L);
++        mockUser.setUsername(username);
++        mockUser.setPassword(encodedPassword);
++        mockUser.setStatus(0);
++
++        when(userService.getByUsername(username)).thenReturn(mockUser);
++        when(passwordEncoder.matches(password, encodedPassword)).thenReturn(true);
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(403, result.getCode());
++        assertEquals("璐︽埛宸茶绂佺敤", result.getMessage());
++
++        verify(userService, times(1)).getByUsername(username);
++        verify(passwordEncoder, times(1)).matches(password, encodedPassword);
++        verify(jwtUtil, never()).generateToken(anyString());
++    }
++
++    @Test
++    void testLogin_EmptyCredentials() {
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", null);
++        credentials.put("password", null);
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(400, result.getCode());
++        assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++
++        verify(userService, never()).getByUsername(anyString());
++        verify(passwordEncoder, never()).matches(anyString(), anyString());
++        verify(jwtUtil, never()).generateToken(anyString());
++    }
++
++    @Test
++    void testLogin_EmptyUsername() {
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", "");
++        credentials.put("password", "password");
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(400, result.getCode());
++        assertEquals("鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖", result.getMessage());
++
++        verify(userService, never()).getByUsername(anyString());
++    }
++
++    @Test
++    void testLogin_ReturnsJwtToken() {
++        String username = "testuser";
++        String password = "password";
++        String encodedPassword = "$2a$10$encodedPasswordHash";
++        String expectedToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlciJ9.mockSignature";
++
++        Map<String, String> credentials = new HashMap<>();
++        credentials.put("username", username);
++        credentials.put("password", password);
++
++        User mockUser = new User();
++        mockUser.setId(1L);
++        mockUser.setUsername(username);
++        mockUser.setPassword(encodedPassword);
++        mockUser.setRealName("娴嬭瘯鐢ㄦ埛");
++        mockUser.setStatus(1);
++
++        when(userService.getByUsername(username)).thenReturn(mockUser);
++        when(passwordEncoder.matches(password, encodedPassword)).thenReturn(true);
++        when(jwtUtil.generateToken(username)).thenReturn(expectedToken);
++
++        Result<?> result = authController.login(credentials);
++
++        assertNotNull(result);
++        assertEquals(200, result.getCode());
++        assertTrue(result.getData() instanceof Map);
++
++        @SuppressWarnings("unchecked")
++        Map<String, Object> data = (Map<String, Object>) result.getData();
++        assertEquals(expectedToken, data.get("token"));
++        assertEquals(username, data.get("username"));
++        assertEquals("娴嬭瘯鐢ㄦ埛", data.get("realName"));
++    }
++}
+diff --git a/backend/src/test/java/com/labelease/usermanagement/service/OrderServiceTest.java b/backend/src/test/java/com/labelease/usermanagement/service/OrderServiceTest.java
+new file mode 100644
+index 0000000..cb8527d
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/service/OrderServiceTest.java
+@@ -0,0 +1,192 @@
++package com.labelease.usermanagement.service;
++
++import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
++import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.labelease.usermanagement.entity.Order;
++import com.labelease.usermanagement.mapper.OrderMapper;
++import com.labelease.usermanagement.service.impl.OrderServiceImpl;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.math.BigDecimal;
++import java.util.Arrays;
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.*;
++import static org.mockito.Mockito.*;
++
++/**
++ * OrderService 鍗曞厓娴嬭瘯
++ */
++@ExtendWith(MockitoExtension.class)
++class OrderServiceTest {
++
++    @Mock
++    private OrderMapper orderMapper;
++
++    @InjectMocks
++    private OrderServiceImpl orderService;
++
++    @Test
++    void testCreateOrder_Success() {
++        Order order = new Order();
++        order.setOrderNo("ORD2024001");
++        order.setUserId(1L);
++        order.setProductName("娴嬭瘯鍟嗗搧");
++        order.setAmount(new BigDecimal("99.99"));
++        order.setStatus(0);
++
++        when(orderMapper.insert(any(Order.class))).thenReturn(1);
++
++        boolean result = orderService.save(order);
++
++        assertTrue(result);
++        verify(orderMapper, times(1)).insert(any(Order.class));
++    }
++
++    @Test
++    void testCreateOrder_AmountValidation() {
++        Order order = new Order();
++        order.setOrderNo("ORD2024002");
++        order.setUserId(1L);
++        order.setProductName("娴嬭瘯鍟嗗搧");
++        order.setAmount(new BigDecimal("-10.00"));
++        order.setStatus(0);
++
++        when(orderMapper.insert(any(Order.class))).thenThrow(new IllegalArgumentException("璁㈠崟閲戦涓嶈兘涓鸿礋鏁?));
++
++        assertThrows(IllegalArgumentException.class, () -> orderService.save(order));
++        verify(orderMapper, times(1)).insert(any(Order.class));
++    }
++
++    @Test
++    void testListByUserId_Found() {
++        Long userId = 1L;
++        Order order1 = new Order();
++        order1.setId(1L);
++        order1.setOrderNo("ORD2024001");
++        order1.setUserId(userId);
++
++        Order order2 = new Order();
++        order2.setId(2L);
++        order2.setOrderNo("ORD2024002");
++        order2.setUserId(userId);
++
++        List<Order> expectedOrders = Arrays.asList(order1, order2);
++
++        when(orderMapper.selectByUserId(userId)).thenReturn(expectedOrders);
++
++        List<Order> result = orderService.listByUserId(userId);
++
++        assertNotNull(result);
++        assertEquals(2, result.size());
++        assertEquals(userId, result.get(0).getUserId());
++        verify(orderMapper, times(1)).selectByUserId(userId);
++    }
++
++    @Test
++    void testListByUserId_Empty() {
++        Long userId = 999L;
++
++        when(orderMapper.selectByUserId(userId)).thenReturn(Arrays.asList());
++
++        List<Order> result = orderService.listByUserId(userId);
++
++        assertNotNull(result);
++        assertTrue(result.isEmpty());
++        verify(orderMapper, times(1)).selectByUserId(userId);
++    }
++
++    @Test
++    void testPageOrders_WithoutKeyword() {
++        int current = 1;
++        int size = 10;
++        Page<Order> expectedPage = new Page<>(current, size);
++        expectedPage.setRecords(Arrays.asList(new Order(), new Order()));
++        expectedPage.setTotal(2);
++
++        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expectedPage);
++
++        Page<Order> result = orderService.pageOrders(current, size, null);
++
++        assertNotNull(result);
++        assertEquals(2, result.getRecords().size());
++        assertEquals(2, result.getTotal());
++        verify(orderMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++    }
++
++    @Test
++    void testPageOrders_WithKeyword() {
++        int current = 1;
++        int size = 10;
++        String keyword = "ORD2024";
++        Page<Order> expectedPage = new Page<>(current, size);
++        expectedPage.setRecords(Arrays.asList(new Order()));
++        expectedPage.setTotal(1);
++
++        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expectedPage);
++
++        Page<Order> result = orderService.pageOrders(current, size, keyword);
++
++        assertNotNull(result);
++        assertEquals(1, result.getRecords().size());
++        assertEquals(1, result.getTotal());
++        verify(orderMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++    }
++
++    @Test
++    void testUpdateOrder_Success() {
++        Order updateOrder = new Order();
++        updateOrder.setId(1L);
++        updateOrder.setStatus(1);
++
++        when(orderMapper.updateById(any(Order.class))).thenReturn(1);
++
++        boolean result = orderService.updateById(updateOrder);
++
++        assertTrue(result);
++        verify(orderMapper, times(1)).updateById(any(Order.class));
++    }
++
++    @Test
++    void testUpdateOrder_NotExists() {
++        Order updateOrder = new Order();
++        updateOrder.setId(999L);
++        updateOrder.setStatus(1);
++
++        when(orderMapper.updateById(any(Order.class))).thenReturn(0);
++
++        boolean result = orderService.updateById(updateOrder);
++
++        assertFalse(result);
++        verify(orderMapper, times(1)).updateById(any(Order.class));
++    }
++
++    @Test
++    void testDeleteOrder_Success() {
++        Long orderId = 1L;
++
++        when(orderMapper.deleteById(orderId)).thenReturn(1);
++
++        boolean result = orderService.removeById(orderId);
++
++        assertTrue(result);
++        verify(orderMapper, times(1)).deleteById(orderId);
++    }
++
++    @Test
++    void testBatchDeleteOrders_Success() {
++        List<Long> orderIds = Arrays.asList(1L, 2L, 3L);
++
++        when(orderMapper.deleteBatchIds(orderIds)).thenReturn(3);
++
++        boolean result = orderService.removeByIds(orderIds);
++
++        assertTrue(result);
++        verify(orderMapper, times(1)).deleteBatchIds(orderIds);
++    }
++}
+diff --git a/backend/src/test/java/com/labelease/usermanagement/service/UserServiceTest.java b/backend/src/test/java/com/labelease/usermanagement/service/UserServiceTest.java
+new file mode 100644
+index 0000000..a7cdd38
+--- /dev/null
++++ b/backend/src/test/java/com/labelease/usermanagement/service/UserServiceTest.java
+@@ -0,0 +1,192 @@
++package com.labelease.usermanagement.service;
++
++import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
++import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.labelease.usermanagement.entity.User;
++import com.labelease.usermanagement.mapper.UserMapper;
++import com.labelease.usermanagement.service.impl.UserServiceImpl;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.dao.DuplicateKeyException;
++
++import java.time.LocalDateTime;
++import java.util.Arrays;
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.*;
++import static org.mockito.Mockito.*;
++
++/**
++ * UserService 鍗曞厓娴嬭瘯
++ */
++@ExtendWith(MockitoExtension.class)
++class UserServiceTest {
++
++    @Mock
++    private UserMapper userMapper;
++
++    @InjectMocks
++    private UserServiceImpl userService;
++
++    @Test
++    void testSaveUser_Success() {
++        User user = new User();
++        user.setUsername("testuser");
++        user.setPassword("password");
++        user.setRealName("娴嬭瘯鐢ㄦ埛");
++        user.setEmail("test@example.com");
++        user.setPhone("13800138000");
++        user.setStatus(1);
++
++        when(userMapper.insert(any(User.class))).thenReturn(1);
++
++        boolean result = userService.save(user);
++
++        assertTrue(result);
++        verify(userMapper, times(1)).insert(any(User.class));
++    }
++
++    @Test
++    void testSaveUser_DuplicateUsername() {
++        User user = new User();
++        user.setUsername("existinguser");
++        user.setPassword("password");
++        user.setRealName("鐜版湁鐢ㄦ埛");
++        user.setStatus(1);
++
++        when(userMapper.insert(any(User.class))).thenThrow(new DuplicateKeyException("鐢ㄦ埛鍚嶉噸澶?));
++
++        assertThrows(DuplicateKeyException.class, () -> userService.save(user));
++        verify(userMapper, times(1)).insert(any(User.class));
++    }
++
++    @Test
++    void testUpdateUser_Success() {
++        User existingUser = new User();
++        existingUser.setId(1L);
++        existingUser.setUsername("testuser");
++        existingUser.setRealName("鍘熷鍚?);
++        existingUser.setStatus(1);
++        existingUser.setCreateTime(LocalDateTime.now());
++
++        User updateUser = new User();
++        updateUser.setId(1L);
++        updateUser.setRealName("鏂板鍚?);
++        updateUser.setEmail("new@example.com");
++
++        when(userMapper.updateById(any(User.class))).thenReturn(1);
++
++        boolean result = userService.updateById(updateUser);
++
++        assertTrue(result);
++        verify(userMapper, times(1)).updateById(any(User.class));
++    }
++
++    @Test
++    void testUpdateUser_NotExists() {
++        User updateUser = new User();
++        updateUser.setId(999L);
++        updateUser.setRealName("涓嶅瓨鍦ㄧ殑鐢ㄦ埛");
++
++        when(userMapper.updateById(any(User.class))).thenReturn(0);
++
++        boolean result = userService.updateById(updateUser);
++
++        assertFalse(result);
++        verify(userMapper, times(1)).updateById(any(User.class));
++    }
++
++    @Test
++    void testDeleteUser_Success() {
++        Long userId = 1L;
++
++        when(userMapper.deleteById(userId)).thenReturn(1);
++
++        boolean result = userService.removeById(userId);
++
++        assertTrue(result);
++        verify(userMapper, times(1)).deleteById(userId);
++    }
++
++    @Test
++    void testBatchDeleteUsers_Success() {
++        List<Long> userIds = Arrays.asList(1L, 2L, 3L);
++
++        when(userMapper.deleteBatchIds(userIds)).thenReturn(3);
++
++        boolean result = userService.removeByIds(userIds);
++
++        assertTrue(result);
++        verify(userMapper, times(1)).deleteBatchIds(userIds);
++    }
++
++    @Test
++    void testPageUsers_WithoutKeyword() {
++        int current = 1;
++        int size = 10;
++        Page<User> expectedPage = new Page<>(current, size);
++        expectedPage.setRecords(Arrays.asList(new User(), new User()));
++        expectedPage.setTotal(2);
++
++        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expectedPage);
++
++        Page<User> result = userService.pageUsers(current, size, null);
++
++        assertNotNull(result);
++        assertEquals(2, result.getRecords().size());
++        assertEquals(2, result.getTotal());
++        verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++    }
++
++    @Test
++    void testPageUsers_WithKeyword() {
++        int current = 1;
++        int size = 10;
++        String keyword = "test";
++        Page<User> expectedPage = new Page<>(current, size);
++        expectedPage.setRecords(Arrays.asList(new User()));
++        expectedPage.setTotal(1);
++
++        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expectedPage);
++
++        Page<User> result = userService.pageUsers(current, size, keyword);
++
++        assertNotNull(result);
++        assertEquals(1, result.getRecords().size());
++        assertEquals(1, result.getTotal());
++        verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
++    }
++
++    @Test
++    void testGetByUsername_Found() {
++        String username = "testuser";
++        User expectedUser = new User();
++        expectedUser.setId(1L);
++        expectedUser.setUsername(username);
++        expectedUser.setRealName("娴嬭瘯鐢ㄦ埛");
++
++        when(userMapper.selectByUsername(username)).thenReturn(expectedUser);
++
++        User result = userService.getByUsername(username);
++
++        assertNotNull(result);
++        assertEquals(username, result.getUsername());
++        verify(userMapper, times(1)).selectByUsername(username);
++    }
++
++    @Test
++    void testGetByUsername_NotFound() {
++        String username = "nonexistent";
++
++        when(userMapper.selectByUsername(username)).thenReturn(null);
++
++        User result = userService.getByUsername(username);
++
++        assertNull(result);
++        verify(userMapper, times(1)).selectByUsername(username);
++    }
++}
