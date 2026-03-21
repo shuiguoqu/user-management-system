@@ -1,0 +1,234 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..35aef3b
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,53 @@
++name: CI
++
++on:
++  push:
++    branches: [main, master, develop]
++  pull_request:
++    branches: [main, master, develop]
++
++jobs:
++  backend:
++    name: Backend Build & Test
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: backend
++
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@v4
++
++      - name: Set up JDK 17
++        uses: actions/setup-java@v4
++        with:
++          java-version: '17'
++          distribution: 'temurin'
++          cache: maven
++
++      - name: Build and verify with Maven
++        run: mvn verify -B
++
++  frontend:
++    name: Frontend Build
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: frontend
++
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@v4
++
++      - name: Set up Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++          cache: 'npm'
++          cache-dependency-path: frontend/package-lock.json
++
++      - name: Install dependencies
++        run: npm ci
++
++      - name: Build project
++        run: npm run build
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..5b952b7
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,66 @@
++.PHONY: help dev build up down logs clean rebuild backend frontend
++
++help:
++	@echo "鐢ㄦ埛绠＄悊绯荤粺 - 蹇嵎鍛戒护"
++	@echo ""
++	@echo "浣跨敤鏂规硶: make <command>"
++	@echo ""
++	@echo "鍙敤鍛戒护:"
++	@echo "  dev       鍚姩寮€鍙戠幆澧冿紙鏋勫缓骞跺悗鍙拌繍琛屾墍鏈夋湇鍔★級"
++	@echo "  build     鏋勫缓鎵€鏈夋湇鍔＄殑 Docker 闀滃儚"
++	@echo "  up        鍚姩鎵€鏈夋湇鍔★紙鍚庡彴杩愯锛?
++	@echo "  down      鍋滄骞剁Щ闄ゆ墍鏈夊鍣?
++	@echo "  logs      鏌ョ湅鎵€鏈夋湇鍔＄殑鏃ュ織"
++	@echo "  logs-b    鏌ョ湅鍚庣鏈嶅姟鏃ュ織"
++	@echo "  logs-f    鏌ョ湅鍓嶇鏈嶅姟鏃ュ織"
++	@echo "  logs-db   鏌ョ湅鏁版嵁搴撴湇鍔℃棩蹇?
++	@echo "  clean     娓呯悊鏋勫缓浜х墿鍜屾湭浣跨敤鐨勯暅鍍?
++	@echo "  rebuild   閲嶆柊鏋勫缓鎵€鏈夋湇鍔★紙涓嶄娇鐢ㄧ紦瀛橈級"
++	@echo "  backend   浠呮瀯寤哄悗绔湇鍔?
++	@echo "  frontend  浠呮瀯寤哄墠绔湇鍔?
++	@echo "  ps        鏌ョ湅鏈嶅姟鐘舵€?
++	@echo ""
++
++dev: build up
++	@echo ""
++	@echo "鏈嶅姟宸插惎鍔紝璁块棶鍦板潃:"
++	@echo "  鍓嶇椤甸潰: http://localhost:3010"
++	@echo "  鍚庣 API: http://localhost:3011"
++	@echo "  Swagger:  http://localhost:3011/swagger-ui/index.html"
++
++build:
++	docker compose build
++
++up:
++	docker compose up -d
++
++down:
++	docker compose down
++
++logs:
++	docker compose logs -f
++
++logs-b:
++	docker compose logs -f backend
++
++logs-f:
++	docker compose logs -f frontend
++
++logs-db:
++	docker compose logs -f db
++
++clean:
++	docker compose down -v --rmi local
++	docker system prune -f
++
++rebuild:
++	docker compose build --no-cache
++
++backend:
++	docker compose build backend
++
++frontend:
++	docker compose build frontend
++
++ps:
++	docker compose ps
+diff --git a/backend/.dockerignore b/backend/.dockerignore
+new file mode 100644
+index 0000000..0cd1d20
+--- /dev/null
++++ b/backend/.dockerignore
+@@ -0,0 +1,33 @@
++# Maven build output
++target/
++
++# IDE files
++.idea/
++*.iml
++*.ipr
++*.iws
++.vscode/
++*.swp
++*.swo
++
++# Git
++.git/
++.gitignore
++
++# Node.js (for frontend reference)
++node_modules/
++
++# OS files
++.DS_Store
++Thumbs.db
++
++# Logs
++*.log
++logs/
++
++# Test coverage
++coverage/
++
++# Temporary files
++*.tmp
++*.temp
+diff --git a/backend/Dockerfile b/backend/Dockerfile
+index c55e0be..8ceb1f0 100644
+--- a/backend/Dockerfile
++++ b/backend/Dockerfile
+@@ -7,16 +7,22 @@ COPY settings.xml /root/.m2/settings.xml
+ 
+ # 鍏堝鍒?pom.xml 鍒╃敤 Docker 缂撳瓨涓嬭浇渚濊禆
+ COPY pom.xml .
+-RUN mvn dependency:go-offline -B
++RUN --mount=type=cache,target=/root/.m2/repository \
++    mvn dependency:go-offline -B
+ 
+ # 澶嶅埗婧愮爜骞舵瀯寤? COPY src ./src
+-RUN mvn package -DskipTests -B
++RUN --mount=type=cache,target=/root/.m2/repository \
++    mvn package -DskipTests -B
+ 
+ # ---- Runtime Stage ----
+ FROM eclipse-temurin:17-jre
+ WORKDIR /app
+ 
++# 瀹夎 curl 鐢ㄤ簬鍋ュ悍妫€鏌?+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
++    rm -rf /var/lib/apt/lists/*
++
+ # 璁剧疆鐜鍙橀噺
+ ENV LANG=C.UTF-8
+ ENV LC_ALL=C.UTF-8
+@@ -26,4 +32,7 @@ COPY --from=builder /app/target/*.jar app.jar
+ 
+ EXPOSE 8080
+ 
+-ENTRYPOINT ["java", "-Dfile.encoding=UTF-8", "-jar", "app.jar"]
++HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
++    CMD curl -f http://localhost:8080/swagger-ui/index.html || exit 1
++
++ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dfile.encoding=UTF-8 -jar app.jar"]
+diff --git a/docker-compose.yml b/docker-compose.yml
+index d08e9d5..d43e1af 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -48,6 +48,13 @@ services:
+       SPRING_DATASOURCE_USERNAME: root
+       SPRING_DATASOURCE_PASSWORD: root123456
+       TZ: Asia/Shanghai
++      JAVA_OPTS: "-Xmx512m -Xms256m -XX:+UseG1GC"
++    healthcheck:
++      test: ["CMD", "curl", "-f", "http://localhost:8080/swagger-ui/index.html"]
++      interval: 30s
++      timeout: 10s
++      retries: 3
++      start_period: 60s
+     depends_on:
+       db:
+         condition: service_healthy
+@@ -64,7 +71,8 @@ services:
+     ports:
+       - "3010:80"
+     depends_on:
+-      - backend
++      backend:
++        condition: service_healthy
+     networks:
+       - app-network
+ 
