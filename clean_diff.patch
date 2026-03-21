@@ -1,0 +1,1137 @@
+﻿diff --git a/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java b/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java
+new file mode 100644
+index 0000000..8ee111d
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/controller/StatisticsController.java
+@@ -0,0 +1,38 @@
++package com.labelease.usermanagement.controller;
++
++import com.labelease.usermanagement.common.Result;
++import com.labelease.usermanagement.dto.DashboardStatsDTO;
++import com.labelease.usermanagement.dto.TrendDataDTO;
++import com.labelease.usermanagement.service.StatisticsService;
++import io.swagger.v3.oas.annotations.Operation;
++import io.swagger.v3.oas.annotations.tags.Tag;
++import lombok.RequiredArgsConstructor;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
++
++import java.util.List;
++
++/**
++ * 缁熻鏁版嵁鎺у埗鍣?- 浠〃鐩樻暟鎹帴鍙?+ */
++@Tag(name = "缁熻鏁版嵁", description = "浠〃鐩樼粺璁′笌瓒嬪娍鏁版嵁")
++@RestController
++@RequestMapping("/api/statistics")
++@RequiredArgsConstructor
++public class StatisticsController {
++
++    private final StatisticsService statisticsService;
++
++    @Operation(summary = "鑾峰彇浠〃鐩樼粺璁℃暟鎹?)
++    @GetMapping("/dashboard")
++    public Result<DashboardStatsDTO> getDashboardStats() {
++        return Result.success(statisticsService.getDashboardStats());
++    }
++
++    @Operation(summary = "鑾峰彇鏈€杩?澶╄秼鍔挎暟鎹?)
++    @GetMapping("/trend")
++    public Result<List<TrendDataDTO>> getTrendData() {
++        return Result.success(statisticsService.getTrendData());
++    }
++}
+diff --git a/backend/src/main/java/com/labelease/usermanagement/dto/DashboardStatsDTO.java b/backend/src/main/java/com/labelease/usermanagement/dto/DashboardStatsDTO.java
+new file mode 100644
+index 0000000..fa37048
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/dto/DashboardStatsDTO.java
+@@ -0,0 +1,23 @@
++package com.labelease.usermanagement.dto;
++
++import lombok.Data;
++import java.math.BigDecimal;
++
++/**
++ * 浠〃鐩樼粺璁℃暟鎹?DTO
++ */
++@Data
++public class DashboardStatsDTO {
++
++    /** 鐢ㄦ埛鎬绘暟 */
++    private Long totalUsers;
++
++    /** 鏈湀鏂板鐢ㄦ埛鏁?*/
++    private Long newUsersThisMonth;
++
++    /** 璁㈠崟鎬绘暟 */
++    private Long totalOrders;
++
++    /** 鎵€鏈夎鍗曟€婚噾棰?*/
++    private BigDecimal totalAmount;
++}
+diff --git a/backend/src/main/java/com/labelease/usermanagement/dto/TrendDataDTO.java b/backend/src/main/java/com/labelease/usermanagement/dto/TrendDataDTO.java
+new file mode 100644
+index 0000000..63a15af
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/dto/TrendDataDTO.java
+@@ -0,0 +1,23 @@
++package com.labelease.usermanagement.dto;
++
++import lombok.AllArgsConstructor;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++/**
++ * 瓒嬪娍鏁版嵁 DTO
++ */
++@Data
++@NoArgsConstructor
++@AllArgsConstructor
++public class TrendDataDTO {
++
++    /** 鏃ユ湡 (鏍煎紡: yyyy-MM-dd) */
++    private String date;
++
++    /** 褰撳ぉ鏂板鐢ㄦ埛鏁?*/
++    private Integer newUsers;
++
++    /** 褰撳ぉ鏂板璁㈠崟鏁?*/
++    private Integer newOrders;
++}
+diff --git a/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java b/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java
+index 7fe0bb5..bf94d3c 100644
+--- a/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java
++++ b/backend/src/main/java/com/labelease/usermanagement/mapper/OrderMapper.java
+@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
+ import org.apache.ibatis.annotations.Param;
+ import org.apache.ibatis.annotations.Select;
+ 
++import java.math.BigDecimal;
++import java.time.LocalDateTime;
+ import java.util.List;
+ 
+ /**
+@@ -17,4 +19,16 @@ public interface OrderMapper extends BaseMapper<Order> {
+     /** 鏍规嵁鐢ㄦ埛ID鏌ヨ璇ョ敤鎴风殑鎵€鏈夎鍗?*/
+     @Select("SELECT * FROM t_order WHERE user_id = #{userId} AND deleted = 0 ORDER BY create_time DESC")
+     List<Order> selectByUserId(@Param("userId") Long userId);
++
++    /** 缁熻璁㈠崟鎬绘暟 */
++    @Select("SELECT COUNT(*) FROM t_order WHERE deleted = 0")
++    Long countTotalOrders();
++
++    /** 缁熻鎵€鏈夎鍗曟€婚噾棰?*/
++    @Select("SELECT COALESCE(SUM(amount), 0) FROM t_order WHERE deleted = 0")
++    BigDecimal sumTotalAmount();
++
++    /** 缁熻鎸囧畾鏃ユ湡鐨勬柊澧炶鍗曟暟 */
++    @Select("SELECT COUNT(*) FROM t_order WHERE deleted = 0 AND DATE(create_time) = DATE(#{date)")
++    Integer countNewOrdersByDate(@Param("date") LocalDateTime date);
+ }
+diff --git a/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java b/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java
+index bd303c0..b534daa 100644
+--- a/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java
++++ b/backend/src/main/java/com/labelease/usermanagement/mapper/UserMapper.java
+@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
+ import org.apache.ibatis.annotations.Param;
+ import org.apache.ibatis.annotations.Select;
+ 
++import java.time.LocalDateTime;
++
+ /**
+  * 鐢ㄦ埛鏁版嵁璁块棶灞?  */
+@@ -15,4 +17,16 @@ public interface UserMapper extends BaseMapper<User> {
+     /** 鏍规嵁鐢ㄦ埛鍚嶆煡璇紙鍚瘑鐮侊紝鐢ㄤ簬鐧诲綍锛?*/
+     @Select("SELECT * FROM t_user WHERE username = #{username} AND deleted = 0")
+     User selectByUsername(@Param("username") String username);
++
++    /** 缁熻鐢ㄦ埛鎬绘暟 */
++    @Select("SELECT COUNT(*) FROM t_user WHERE deleted = 0")
++    Long countTotalUsers();
++
++    /** 缁熻鎸囧畾鏃堕棿涔嬪悗鏂板鐨勭敤鎴锋暟 */
++    @Select("SELECT COUNT(*) FROM t_user WHERE deleted = 0 AND create_time >= #{startTime}")
++    Long countNewUsersAfter(@Param("startTime") LocalDateTime startTime);
++
++    /** 缁熻鎸囧畾鏃ユ湡鐨勬柊澧炵敤鎴锋暟 */
++    @Select("SELECT COUNT(*) FROM t_user WHERE deleted = 0 AND DATE(create_time) = DATE(#{date)")
++    Integer countNewUsersByDate(@Param("date") LocalDateTime date);
+ }
+diff --git a/backend/src/main/java/com/labelease/usermanagement/service/StatisticsService.java b/backend/src/main/java/com/labelease/usermanagement/service/StatisticsService.java
+new file mode 100644
+index 0000000..a1d65dd
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/service/StatisticsService.java
+@@ -0,0 +1,22 @@
++package com.labelease.usermanagement.service;
++
++import com.labelease.usermanagement.dto.DashboardStatsDTO;
++import com.labelease.usermanagement.dto.TrendDataDTO;
++
++import java.util.List;
++
++/**
++ * 缁熻鏈嶅姟鎺ュ彛
++ */
++public interface StatisticsService {
++
++    /**
++     * 鑾峰彇浠〃鐩樼粺璁℃暟鎹?+     */
++    DashboardStatsDTO getDashboardStats();
++
++    /**
++     * 鑾峰彇鏈€杩?澶╄秼鍔挎暟鎹?+     */
++    List<TrendDataDTO> getTrendData();
++}
+diff --git a/backend/src/main/java/com/labelease/usermanagement/service/impl/StatisticsServiceImpl.java b/backend/src/main/java/com/labelease/usermanagement/service/impl/StatisticsServiceImpl.java
+new file mode 100644
+index 0000000..c6cf164
+--- /dev/null
++++ b/backend/src/main/java/com/labelease/usermanagement/service/impl/StatisticsServiceImpl.java
+@@ -0,0 +1,67 @@
++package com.labelease.usermanagement.service.impl;
++
++import com.labelease.usermanagement.dto.DashboardStatsDTO;
++import com.labelease.usermanagement.dto.TrendDataDTO;
++import com.labelease.usermanagement.mapper.OrderMapper;
++import com.labelease.usermanagement.mapper.UserMapper;
++import com.labelease.usermanagement.service.StatisticsService;
++import lombok.RequiredArgsConstructor;
++import org.springframework.stereotype.Service;
++
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++import java.time.LocalTime;
++import java.time.format.DateTimeFormatter;
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ * 缁熻鏈嶅姟瀹炵幇
++ */
++@Service
++@RequiredArgsConstructor
++public class StatisticsServiceImpl implements StatisticsService {
++
++    private final UserMapper userMapper;
++    private final OrderMapper orderMapper;
++
++    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
++
++    @Override
++    public DashboardStatsDTO getDashboardStats() {
++        DashboardStatsDTO stats = new DashboardStatsDTO();
++
++        stats.setTotalUsers(userMapper.countTotalUsers());
++
++        LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
++        stats.setNewUsersThisMonth(userMapper.countNewUsersAfter(monthStart));
++
++        stats.setTotalOrders(orderMapper.countTotalOrders());
++
++        stats.setTotalAmount(orderMapper.sumTotalAmount());
++
++        return stats;
++    }
++
++    @Override
++    public List<TrendDataDTO> getTrendData() {
++        List<TrendDataDTO> trendList = new ArrayList<>();
++        LocalDate today = LocalDate.now();
++
++        for (int i = 6; i >= 0; i--) {
++            LocalDate date = today.minusDays(i);
++            LocalDateTime dateTime = date.atTime(LocalTime.MIN);
++
++            Integer newUsers = userMapper.countNewUsersByDate(dateTime);
++            Integer newOrders = orderMapper.countNewOrdersByDate(dateTime);
++
++            trendList.add(new TrendDataDTO(
++                    date.format(DATE_FORMATTER),
++                    newUsers != null ? newUsers : 0,
++                    newOrders != null ? newOrders : 0
++            ));
++        }
++
++        return trendList;
++    }
++}
+diff --git a/backend/src/main/resources/db/test_data.sql b/backend/src/main/resources/db/test_data.sql
+new file mode 100644
+index 0000000..8986eb9
+--- /dev/null
++++ b/backend/src/main/resources/db/test_data.sql
+@@ -0,0 +1,112 @@
++-- ============================================================
++-- 浠〃鐩樻祴璇曟暟鎹?- 鏈€杩?澶╃殑鐢ㄦ埛鍜岃鍗曟暟鎹?+-- 鎵ц姝よ剼鏈墠璇风‘淇濆凡鎵ц init.sql
++-- ============================================================
++
++USE `user_management`;
++
++-- 娓呯悊涔嬪墠鐨勬祴璇曟暟鎹紙淇濈暀admin绛夊熀纭€鐢ㄦ埛锛?+DELETE FROM `t_user` WHERE `username` LIKE 'test_user_%';
++DELETE FROM `t_order` WHERE `order_no` LIKE 'TEST%';
++
++-- ============================================================
++-- 鎻掑叆鏈€杩?澶╃殑娴嬭瘯鐢ㄦ埛
++-- 瀵嗙爜鍧囦负: password123 -> $2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.
++-- ============================================================
++
++-- 6澶╁墠 - 2涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d6_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D6-1', 'test_d6_1@example.com', '13900000001', 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++('test_user_d6_2', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D6-2', 'test_d6_2@example.com', '13900000002', 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY));
++
++-- 5澶╁墠 - 3涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d5_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D5-1', 'test_d5_1@example.com', '13900000003', 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++('test_user_d5_2', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D5-2', 'test_d5_2@example.com', '13900000004', 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++('test_user_d5_3', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D5-3', 'test_d5_3@example.com', '13900000005', 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY));
++
++-- 4澶╁墠 - 1涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d4_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D4-1', 'test_d4_1@example.com', '13900000006', 1, DATE_SUB(CURDATE(), INTERVAL 4 DAY));
++
++-- 3澶╁墠 - 4涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d3_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D3-1', 'test_d3_1@example.com', '13900000007', 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('test_user_d3_2', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D3-2', 'test_d3_2@example.com', '13900000008', 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('test_user_d3_3', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D3-3', 'test_d3_3@example.com', '13900000009', 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('test_user_d3_4', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D3-4', 'test_d3_4@example.com', '13900000010', 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY));
++
++-- 2澶╁墠 - 2涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d2_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D2-1', 'test_d2_1@example.com', '13900000011', 1, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++('test_user_d2_2', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D2-2', 'test_d2_2@example.com', '13900000012', 1, DATE_SUB(CURDATE(), INTERVAL 2 DAY));
++
++-- 鏄ㄥぉ - 3涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d1_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D1-1', 'test_d1_1@example.com', '13900000013', 1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++('test_user_d1_2', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D1-2', 'test_d1_2@example.com', '13900000014', 1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++('test_user_d1_3', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D1-3', 'test_d1_3@example.com', '13900000015', 1, DATE_SUB(CURDATE(), INTERVAL 1 DAY));
++
++-- 浠婂ぉ - 2涓敤鎴?+INSERT INTO `t_user` (`username`, `password`, `real_name`, `email`, `phone`, `status`, `create_time`) VALUES
++('test_user_d0_1', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D0-1', 'test_d0_1@example.com', '13900000016', 1, CURDATE()),
++('test_user_d0_2', '$2a$10$Qm4.QozGlzkmy.7cmwJ8xuMal22vlBR92NvyOMYsI49FERDTzXys.', '娴嬭瘯鐢ㄦ埛D0-2', 'test_d0_2@example.com', '13900000017', 1, CURDATE());
++
++-- ============================================================
++-- 鎻掑叆鏈€杩?澶╃殑娴嬭瘯璁㈠崟
++-- ============================================================
++
++-- 6澶╁墠 - 3涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D6_001', 1, '鏅鸿兘鎵嬭〃', 1299.00, 3, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++('TEST_ORD_D6_002', 2, '钃濈墮闊崇', 399.00, 2, DATE_SUB(CURDATE(), INTERVAL 6 DAY)),
++('TEST_ORD_D6_003', 3, '绉诲姩鐢垫簮', 159.00, 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY));
++
++-- 5澶╁墠 - 5涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D5_001', 1, '鏈烘閿洏', 599.00, 3, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++('TEST_ORD_D5_002', 2, '娓告垙榧犳爣', 299.00, 3, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++('TEST_ORD_D5_003', 3, '鏄剧ず鍣ㄦ敮鏋?, 189.00, 2, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++('TEST_ORD_D5_004', 4, 'USB鎵╁睍鍧?, 259.00, 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY)),
++('TEST_ORD_D5_005', 1, '妗岄潰鏀剁撼鐩?, 89.00, 3, DATE_SUB(CURDATE(), INTERVAL 5 DAY));
++
++-- 4澶╁墠 - 2涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D4_001', 2, '鏃犵嚎鍏呯數鍣?, 129.00, 2, DATE_SUB(CURDATE(), INTERVAL 4 DAY)),
++('TEST_ORD_D4_002', 3, '鎵嬫満澹冲瑁?, 49.00, 3, DATE_SUB(CURDATE(), INTERVAL 4 DAY));
++
++-- 3澶╁墠 - 6涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D3_001', 1, '闄嶅櫔鑰虫満', 899.00, 3, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('TEST_ORD_D3_002', 2, '骞虫澘鏀灦', 159.00, 3, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('TEST_ORD_D3_003', 3, '鎶ょ溂鍙扮伅', 269.00, 2, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('TEST_ORD_D3_004', 4, '妗岄潰椋庢墖', 99.00, 1, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('TEST_ORD_D3_005', 1, '鏁版嵁绾垮瑁?, 39.00, 3, DATE_SUB(CURDATE(), INTERVAL 3 DAY)),
++('TEST_ORD_D3_006', 2, '榧犳爣鍨?, 59.00, 3, DATE_SUB(CURDATE(), INTERVAL 3 DAY));
++
++-- 2澶╁墠 - 4涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D2_001', 1, '鍜栧暋鏈?, 1599.00, 2, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++('TEST_ORD_D2_002', 2, '鍜栧暋璞嗙ぜ鐩?, 199.00, 1, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++('TEST_ORD_D2_003', 3, '淇濇俯鏉?, 89.00, 3, DATE_SUB(CURDATE(), INTERVAL 2 DAY)),
++('TEST_ORD_D2_004', 4, '鑼跺叿濂楄', 359.00, 2, DATE_SUB(CURDATE(), INTERVAL 2 DAY));
++
++-- 鏄ㄥぉ - 3涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D1_001', 1, '杩愬姩鎵嬬幆', 249.00, 1, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++('TEST_ORD_D1_002', 2, '鐟滀冀鍨?, 99.00, 2, DATE_SUB(CURDATE(), INTERVAL 1 DAY)),
++('TEST_ORD_D1_003', 3, '璺崇怀', 39.00, 3, DATE_SUB(CURDATE(), INTERVAL 1 DAY));
++
++-- 浠婂ぉ - 2涓鍗?+INSERT INTO `t_order` (`order_no`, `user_id`, `product_name`, `amount`, `status`, `create_time`) VALUES
++('TEST_ORD_D0_001', 1, '鍔炲叕妞?, 899.00, 0, CURDATE()),
++('TEST_ORD_D0_002', 2, '鑴氳笍鏉?, 129.00, 0, CURDATE());
++
++-- ============================================================
++-- 鏁版嵁缁熻璇存槑
++-- ============================================================
++-- 鐢ㄦ埛瓒嬪娍: [2, 3, 1, 4, 2, 3, 2] (浠?澶╁墠鍒颁粖澶?
++-- 璁㈠崟瓒嬪娍: [3, 5, 2, 6, 4, 3, 2] (浠?澶╁墠鍒颁粖澶?
++-- 鎬绘柊澧炵敤鎴? 17浜?+-- 鎬绘柊澧炶鍗? 25涓?+-- 璁㈠崟鎬婚噾棰? 9,890.00鍏?diff --git a/frontend/package.json b/frontend/package.json
+index ce4ca50..6be080c 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -11,21 +11,22 @@
+     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+   },
+   "dependencies": {
+-    "vue": "^3.4.21",
+-    "vue-router": "^4.3.0",
+-    "element-plus": "^2.7.2",
+-    "axios": "^1.6.8",
+     "@element-plus/icons-vue": "^2.3.1",
+-    "pinia": "^2.1.7"
++    "axios": "^1.6.8",
++    "echarts": "^6.0.0",
++    "element-plus": "^2.7.2",
++    "pinia": "^2.1.7",
++    "vue": "^3.4.21",
++    "vue-router": "^4.3.0"
+   },
+   "devDependencies": {
++    "@typescript-eslint/eslint-plugin": "^7.3.0",
++    "@typescript-eslint/parser": "^7.3.0",
+     "@vitejs/plugin-vue": "^5.0.4",
+-    "typescript": "~5.4.0",
+-    "vite": "^5.2.0",
+-    "vue-tsc": "^2.0.6",
+     "eslint": "^8.57.0",
+     "eslint-plugin-vue": "^9.24.0",
+-    "@typescript-eslint/parser": "^7.3.0",
+-    "@typescript-eslint/eslint-plugin": "^7.3.0"
++    "typescript": "~5.4.0",
++    "vite": "^5.2.0",
++    "vue-tsc": "^2.0.6"
+   }
+ }
+diff --git a/frontend/src/api/statistics.ts b/frontend/src/api/statistics.ts
+new file mode 100644
+index 0000000..1cd42d5
+--- /dev/null
++++ b/frontend/src/api/statistics.ts
+@@ -0,0 +1,22 @@
++import request from './request'
++
++export interface DashboardStats {
++  totalUsers: number
++  newUsersThisMonth: number
++  totalOrders: number
++  totalAmount: number
++}
++
++export interface TrendData {
++  date: string
++  newUsers: number
++  newOrders: number
++}
++
++export function getDashboardStats() {
++  return request.get<DashboardStats>('/statistics/dashboard')
++}
++
++export function getTrendData() {
++  return request.get<TrendData[]>('/statistics/trend')
++}
+diff --git a/frontend/src/components/Layout.vue b/frontend/src/components/Layout.vue
+new file mode 100644
+index 0000000..39cdba7
+--- /dev/null
++++ b/frontend/src/components/Layout.vue
+@@ -0,0 +1,174 @@
++<template>
++  <div class="layout-container">
++    <aside class="sidebar">
++      <div class="sidebar-header">
++        <h1 class="logo">
++          鐢ㄦ埛绠＄悊绯荤粺
++        </h1>
++        <p class="subtitle">
++          Oatmeal Latte
++        </p>
++      </div>
++
++      <el-menu
++        :default-active="activeMenu"
++        class="sidebar-menu"
++        router
++      >
++        <el-menu-item index="/dashboard">
++          <el-icon><DataLine /></el-icon>
++          <span>鏁版嵁浠〃鐩?/span>
++        </el-menu-item>
++        <el-menu-item index="/users">
++          <el-icon><User /></el-icon>
++          <span>鐢ㄦ埛绠＄悊</span>
++        </el-menu-item>
++      </el-menu>
++
++      <div class="sidebar-footer">
++        <div class="user-info">
++          <el-icon :size="20">
++            <UserFilled />
++          </el-icon>
++          <span class="username">{{ username }}</span>
++        </div>
++        <el-button
++          type="danger"
++          text
++          size="small"
++          @click="handleLogout"
++        >
++          <el-icon><SwitchButton /></el-icon>
++          閫€鍑虹櫥褰?+        </el-button>
++      </div>
++    </aside>
++
++    <main class="main-content">
++      <slot />
++    </main>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { computed } from 'vue'
++import { useRoute, useRouter } from 'vue-router'
++import { DataLine, User, UserFilled, SwitchButton } from '@element-plus/icons-vue'
++import { ElMessageBox } from 'element-plus'
++
++const route = useRoute()
++const router = useRouter()
++
++const activeMenu = computed(() => {
++  if (route.path.startsWith('/users')) {
++    return '/users'
++  }
++  return route.path
++})
++
++const username = computed(() => {
++  return localStorage.getItem('realName') || localStorage.getItem('username') || '鐢ㄦ埛'
++})
++
++const handleLogout = async () => {
++  try {
++    await ElMessageBox.confirm('纭畾瑕侀€€鍑虹櫥褰曞悧锛?, '閫€鍑虹‘璁?, {
++      confirmButtonText: '纭畾',
++      cancelButtonText: '鍙栨秷',
++      type: 'warning'
++    })
++    localStorage.removeItem('token')
++    localStorage.removeItem('username')
++    localStorage.removeItem('realName')
++    router.push('/login')
++  } catch {
++    // 鐢ㄦ埛鍙栨秷
++  }
++}
++</script>
++
++<style scoped>
++.layout-container {
++  display: flex;
++  min-height: 100vh;
++  background-color: var(--bg-primary);
++}
++
++.sidebar {
++  width: 240px;
++  background-color: var(--bg-surface);
++  border-right: 1px solid var(--border-color);
++  display: flex;
++  flex-direction: column;
++  flex-shrink: 0;
++}
++
++.sidebar-header {
++  padding: var(--spacing-lg);
++  border-bottom: 1px solid var(--border-color);
++}
++
++.logo {
++  font-size: 18px;
++  font-weight: 600;
++  color: var(--text-primary);
++  margin-bottom: 4px;
++}
++
++.subtitle {
++  font-size: 12px;
++  color: var(--text-secondary);
++}
++
++.sidebar-menu {
++  flex: 1;
++  border-right: none !important;
++  background-color: transparent;
++  padding: var(--spacing-sm) 0;
++}
++
++.sidebar-menu :deep(.el-menu-item) {
++  height: 48px;
++  line-height: 48px;
++  margin: 4px var(--spacing-sm);
++  border-radius: var(--radius-sm);
++  color: var(--text-primary);
++}
++
++.sidebar-menu :deep(.el-menu-item:hover) {
++  background-color: rgba(13, 148, 136, 0.08);
++}
++
++.sidebar-menu :deep(.el-menu-item.is-active) {
++  background-color: rgba(13, 148, 136, 0.12);
++  color: var(--color-interactive);
++  font-weight: 500;
++}
++
++.sidebar-menu :deep(.el-menu-item .el-icon) {
++  font-size: 18px;
++  margin-right: 8px;
++}
++
++.sidebar-footer {
++  padding: var(--spacing-md);
++  border-top: 1px solid var(--border-color);
++}
++
++.user-info {
++  display: flex;
++  align-items: center;
++  gap: var(--spacing-sm);
++  margin-bottom: var(--spacing-sm);
++  color: var(--text-primary);
++}
++
++.username {
++  font-size: 14px;
++}
++
++.main-content {
++  flex: 1;
++  overflow-y: auto;
++}
++</style>
+diff --git a/frontend/src/pages/DashboardPage.vue b/frontend/src/pages/DashboardPage.vue
+new file mode 100644
+index 0000000..f821e5f
+--- /dev/null
++++ b/frontend/src/pages/DashboardPage.vue
+@@ -0,0 +1,446 @@
++<template>
++  <div class="page-container">
++    <div class="page-header">
++      <h1>鏁版嵁浠〃鐩?/h1>
++      <p>绯荤粺杩愯惀鏁版嵁姒傝</p>
++    </div>
++
++    <div class="stats-cards">
++      <el-card
++        class="stat-card"
++        shadow="hover"
++      >
++        <div class="stat-content">
++          <div class="stat-icon user-icon">
++            <el-icon :size="32">
++              <User />
++            </el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-value">
++              {{ stats.totalUsers }}
++            </div>
++            <div class="stat-label">
++              鐢ㄦ埛鎬绘暟
++            </div>
++          </div>
++        </div>
++      </el-card>
++
++      <el-card
++        class="stat-card"
++        shadow="hover"
++      >
++        <div class="stat-content">
++          <div class="stat-icon new-user-icon">
++            <el-icon :size="32">
++              <UserFilled />
++            </el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-value">
++              {{ stats.newUsersThisMonth }}
++            </div>
++            <div class="stat-label">
++              鏈湀鏂板鐢ㄦ埛
++            </div>
++          </div>
++        </div>
++      </el-card>
++
++      <el-card
++        class="stat-card"
++        shadow="hover"
++      >
++        <div class="stat-content">
++          <div class="stat-icon order-icon">
++            <el-icon :size="32">
++              <List />
++            </el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-value">
++              {{ stats.totalOrders }}
++            </div>
++            <div class="stat-label">
++              璁㈠崟鎬绘暟
++            </div>
++          </div>
++        </div>
++      </el-card>
++
++      <el-card
++        class="stat-card"
++        shadow="hover"
++      >
++        <div class="stat-content">
++          <div class="stat-icon amount-icon">
++            <el-icon :size="32">
++              <Money />
++            </el-icon>
++          </div>
++          <div class="stat-info">
++            <div class="stat-value">
++              {{ formatAmount(stats.totalAmount) }}
++            </div>
++            <div class="stat-label">
++              璁㈠崟鎬婚噾棰?+            </div>
++          </div>
++        </div>
++      </el-card>
++    </div>
++
++    <el-card
++      class="chart-card"
++      shadow="hover"
++    >
++      <template #header>
++        <div class="chart-header">
++          <span class="chart-title">鏈€杩?澶╄秼鍔?/span>
++          <div class="chart-legend">
++            <span class="legend-item">
++              <span class="legend-dot user-dot" />
++              鏂板鐢ㄦ埛
++            </span>
++            <span class="legend-item">
++              <span class="legend-dot order-dot" />
++              鏂板璁㈠崟
++            </span>
++          </div>
++        </div>
++      </template>
++      <div
++        ref="chartRef"
++        class="chart-container"
++      />
++    </el-card>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref, onMounted, onUnmounted } from 'vue'
++import { User, UserFilled, List, Money } from '@element-plus/icons-vue'
++import * as echarts from 'echarts'
++import { getDashboardStats, getTrendData, type DashboardStats, type TrendData } from '@/api/statistics'
++
++const chartRef = ref<HTMLElement | null>(null)
++let chartInstance: echarts.ECharts | null = null
++
++const stats = ref<DashboardStats>({
++  totalUsers: 0,
++  newUsersThisMonth: 0,
++  totalOrders: 0,
++  totalAmount: 0
++})
++
++const trendData = ref<TrendData[]>([])
++
++const formatAmount = (amount: number) => {
++  if (amount >= 10000) {
++    return (amount / 10000).toFixed(2) + '涓?
++  }
++  return amount.toFixed(2)
++}
++
++const fetchDashboardStats = async () => {
++  try {
++    const res: any = await getDashboardStats()
++    stats.value = res.data
++  } catch {
++    // error handled in interceptor
++  }
++}
++
++const fetchTrendData = async () => {
++  try {
++    const res: any = await getTrendData()
++    trendData.value = res.data
++    renderChart()
++  } catch {
++    // error handled in interceptor
++  }
++}
++
++const renderChart = () => {
++  if (!chartRef.value || !trendData.value.length) return
++
++  if (chartInstance) {
++    chartInstance.dispose()
++  }
++
++  chartInstance = echarts.init(chartRef.value)
++
++  const dates = trendData.value.map(item => item.date.slice(5))
++  const newUsers = trendData.value.map(item => item.newUsers)
++  const newOrders = trendData.value.map(item => item.newOrders)
++
++  const option: echarts.EChartsOption = {
++    tooltip: {
++      trigger: 'axis',
++      backgroundColor: 'rgba(255, 255, 255, 0.95)',
++      borderColor: '#e4e7ed',
++      borderWidth: 1,
++      textStyle: {
++        color: '#303133'
++      },
++      axisPointer: {
++        type: 'cross',
++        crossStyle: {
++          color: '#999'
++        }
++      }
++    },
++    grid: {
++      left: '3%',
++      right: '4%',
++      bottom: '3%',
++      top: '10%',
++      containLabel: true
++    },
++    xAxis: {
++      type: 'category',
++      data: dates,
++      axisLine: {
++        lineStyle: {
++          color: '#dcdfe6'
++        }
++      },
++      axisLabel: {
++        color: '#606266'
++      }
++    },
++    yAxis: {
++      type: 'value',
++      minInterval: 1,
++      axisLine: {
++        show: false
++      },
++      axisTick: {
++        show: false
++      },
++      axisLabel: {
++        color: '#909399'
++      },
++      splitLine: {
++        lineStyle: {
++          color: '#ebeef5',
++          type: 'dashed'
++        }
++      }
++    },
++    series: [
++      {
++        name: '鏂板鐢ㄦ埛',
++        type: 'line',
++        smooth: true,
++        symbol: 'circle',
++        symbolSize: 8,
++        lineStyle: {
++          width: 3,
++          color: '#409eff'
++        },
++        itemStyle: {
++          color: '#409eff',
++          borderWidth: 2,
++          borderColor: '#fff'
++        },
++        areaStyle: {
++          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
++            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
++          ])
++        },
++        data: newUsers
++      },
++      {
++        name: '鏂板璁㈠崟',
++        type: 'line',
++        smooth: true,
++        symbol: 'circle',
++        symbolSize: 8,
++        lineStyle: {
++          width: 3,
++          color: '#67c23a'
++        },
++        itemStyle: {
++          color: '#67c23a',
++          borderWidth: 2,
++          borderColor: '#fff'
++        },
++        areaStyle: {
++          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++            { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
++            { offset: 1, color: 'rgba(103, 194, 58, 0.05)' }
++          ])
++        },
++        data: newOrders
++      }
++    ]
++  }
++
++  chartInstance.setOption(option)
++}
++
++const handleResize = () => {
++  chartInstance?.resize()
++}
++
++onMounted(() => {
++  fetchDashboardStats()
++  fetchTrendData()
++  window.addEventListener('resize', handleResize)
++})
++
++onUnmounted(() => {
++  window.removeEventListener('resize', handleResize)
++  chartInstance?.dispose()
++})
++</script>
++
++<style scoped>
++.page-container {
++  padding: var(--spacing-lg);
++  max-width: 1200px;
++  margin: 0 auto;
++}
++
++.page-header {
++  margin-bottom: var(--spacing-lg);
++}
++
++.page-header h1 {
++  font-size: 28px;
++  color: var(--text-primary);
++  margin-bottom: 4px;
++}
++
++.page-header p {
++  font-size: 14px;
++  color: var(--text-secondary);
++}
++
++.stats-cards {
++  display: grid;
++  grid-template-columns: repeat(4, 1fr);
++  gap: var(--spacing-md);
++  margin-bottom: var(--spacing-lg);
++}
++
++@media (max-width: 1024px) {
++  .stats-cards {
++    grid-template-columns: repeat(2, 1fr);
++  }
++}
++
++@media (max-width: 640px) {
++  .stats-cards {
++    grid-template-columns: 1fr;
++  }
++}
++
++.stat-card {
++  border-radius: 8px;
++}
++
++.stat-content {
++  display: flex;
++  align-items: center;
++  gap: var(--spacing-md);
++}
++
++.stat-icon {
++  width: 64px;
++  height: 64px;
++  border-radius: 12px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  flex-shrink: 0;
++}
++
++.user-icon {
++  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
++  color: #fff;
++}
++
++.new-user-icon {
++  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
++  color: #fff;
++}
++
++.order-icon {
++  background: linear-gradient(135deg, #e6a23c 0%, #ebb563 100%);
++  color: #fff;
++}
++
++.amount-icon {
++  background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%);
++  color: #fff;
++}
++
++.stat-info {
++  flex: 1;
++}
++
++.stat-value {
++  font-size: 28px;
++  font-weight: 600;
++  color: var(--text-primary);
++  line-height: 1.2;
++}
++
++.stat-label {
++  font-size: 14px;
++  color: var(--text-secondary);
++  margin-top: 4px;
++}
++
++.chart-card {
++  border-radius: 8px;
++}
++
++.chart-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++}
++
++.chart-title {
++  font-size: 16px;
++  font-weight: 500;
++  color: var(--text-primary);
++}
++
++.chart-legend {
++  display: flex;
++  gap: var(--spacing-md);
++}
++
++.legend-item {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 13px;
++  color: var(--text-secondary);
++}
++
++.legend-dot {
++  width: 10px;
++  height: 10px;
++  border-radius: 50%;
++}
++
++.user-dot {
++  background-color: #409eff;
++}
++
++.order-dot {
++  background-color: #67c23a;
++}
++
++.chart-container {
++  width: 100%;
++  height: 350px;
++}
++</style>
+diff --git a/frontend/src/pages/LoginPage.vue b/frontend/src/pages/LoginPage.vue
+index 2166c33..679d639 100644
+--- a/frontend/src/pages/LoginPage.vue
++++ b/frontend/src/pages/LoginPage.vue
+@@ -82,7 +82,7 @@ const handleLogin = async () => {
+     localStorage.setItem('username', res.data.username)
+     localStorage.setItem('realName', res.data.realName)
+     ElMessage.success('鐧诲綍鎴愬姛')
+-    router.push('/users')
++    router.push('/dashboard')
+   } catch {
+     // 閿欒宸插湪鎷︽埅鍣ㄤ腑澶勭悊
+   } finally {
+diff --git a/frontend/src/router/index.ts b/frontend/src/router/index.ts
+index e56ea11..b5d39a7 100644
+--- a/frontend/src/router/index.ts
++++ b/frontend/src/router/index.ts
+@@ -11,25 +11,34 @@ const router = createRouter({
+     },
+     {
+       path: '/',
+-      redirect: '/users'
+-    },
+-    {
+-      path: '/users',
+-      name: 'UserList',
+-      component: () => import('@/pages/UserListPage.vue'),
+-      meta: { requiresAuth: true }
+-    },
+-    {
+-      path: '/users/create',
+-      name: 'UserCreate',
+-      component: () => import('@/pages/UserFormPage.vue'),
+-      meta: { requiresAuth: true }
+-    },
+-    {
+-      path: '/users/:id/edit',
+-      name: 'UserEdit',
+-      component: () => import('@/pages/UserFormPage.vue'),
+-      meta: { requiresAuth: true }
++      component: () => import('@/components/Layout.vue'),
++      meta: { requiresAuth: true },
++      children: [
++        {
++          path: '',
++          redirect: '/dashboard'
++        },
++        {
++          path: 'dashboard',
++          name: 'Dashboard',
++          component: () => import('@/pages/DashboardPage.vue')
++        },
++        {
++          path: 'users',
++          name: 'UserList',
++          component: () => import('@/pages/UserListPage.vue')
++        },
++        {
++          path: 'users/create',
++          name: 'UserCreate',
++          component: () => import('@/pages/UserFormPage.vue')
++        },
++        {
++          path: 'users/:id/edit',
++          name: 'UserEdit',
++          component: () => import('@/pages/UserFormPage.vue')
++        }
++      ]
+     }
+   ]
+ })
+@@ -40,7 +49,7 @@ router.beforeEach((to, _from, next) => {
+   if (to.meta.requiresAuth && !token) {
+     next('/login')
+   } else if (to.path === '/login' && token) {
+-    next('/users')
++    next('/dashboard')
+   } else {
+     next()
+   }
+diff --git a/glm_diff.patch b/glm_diff.patch
+new file mode 100644
+index 0000000..6e4aac6
+Binary files /dev/null and b/glm_diff.patch differ

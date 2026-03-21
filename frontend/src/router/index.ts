@@ -11,25 +11,34 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/users'
-    },
-    {
-      path: '/users',
-      name: 'UserList',
-      component: () => import('@/pages/UserListPage.vue'),
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/users/create',
-      name: 'UserCreate',
-      component: () => import('@/pages/UserFormPage.vue'),
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/users/:id/edit',
-      name: 'UserEdit',
-      component: () => import('@/pages/UserFormPage.vue'),
-      meta: { requiresAuth: true }
+      component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          redirect: '/dashboard'
+        },
+        {
+          path: 'dashboard',
+          name: 'Dashboard',
+          component: () => import('@/pages/DashboardPage.vue')
+        },
+        {
+          path: 'users',
+          name: 'UserList',
+          component: () => import('@/pages/UserListPage.vue')
+        },
+        {
+          path: 'users/create',
+          name: 'UserCreate',
+          component: () => import('@/pages/UserFormPage.vue')
+        },
+        {
+          path: 'users/:id/edit',
+          name: 'UserEdit',
+          component: () => import('@/pages/UserFormPage.vue')
+        }
+      ]
     }
   ]
 })
@@ -40,7 +49,7 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresAuth && !token) {
     next('/login')
   } else if (to.path === '/login' && token) {
-    next('/users')
+    next('/dashboard')
   } else {
     next()
   }
