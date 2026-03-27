@@ -56,7 +56,8 @@ public class JwtUtil {
                     .build()
                     .parseSignedClaims(token);
             return true;
-        } catch (Exception e) {
+        } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
+            // 捕获所有JWT相关异常：过期、签名无效、格式错误等
             return false;
         }
     }

@@ -8,15 +8,20 @@
     <!-- 搜索栏与操作按钮 -->
     <el-card class="search-card">
       <div class="toolbar">
-        <el-input
-          v-model="keyword"
-          placeholder="搜索用户名、姓名、邮箱、手机号..."
-          prefix-icon="Search"
-          clearable
-          style="width: 320px"
-          @keyup.enter="fetchUsers"
-          @clear="fetchUsers"
-        />
+        <div style="display: flex; gap: 12px; align-items: center">
+          <el-input
+            v-model="keyword"
+            placeholder="搜索用户名、姓名、邮箱、手机号..."
+            prefix-icon="Search"
+            clearable
+            style="width: 320px"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
+          />
+          <el-button type="primary" @click="handleSearch">
+            搜索
+          </el-button>
+        </div>
         <el-button
           type="primary"
           icon="Plus"
@@ -124,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUsers, deleteUser } from '@/api/user'
@@ -187,6 +192,17 @@ const handleDelete = async (row: any) => {
     // 用户取消操作
   }
 }
+
+/** 搜索用户 */
+const handleSearch = () => {
+  pagination.current = 1
+  fetchUsers()
+}
+
+/** 监听关键词变化 */
+watch(keyword, () => {
+  // 可以在这里实现实时搜索，或者保留给搜索按钮触发
+})
 
 onMounted(() => {
   fetchUsers()

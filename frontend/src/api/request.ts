@@ -18,12 +18,21 @@ const service = axios.create({
 service.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
+    
     if (token) {
+      // 确保headers对象存在
+      if (!config.headers) {
+        config.headers = {}
+      }
       config.headers.Authorization = `Bearer ${token}`
     }
+    
     return config
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('请求拦截器错误:', error)
+    return Promise.reject(error)
+  }
 )
 
 // 响应拦截器 - 统一处理错误
