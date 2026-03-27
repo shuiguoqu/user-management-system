@@ -2,10 +2,6 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
-/**
- * Axios 实例 - 统一请求封装
- * baseURL 指向 /api，由 Nginx 反向代理到后端服务
- */
 const service = axios.create({
   baseURL: '/api',
   timeout: 15000,
@@ -14,11 +10,11 @@ const service = axios.create({
   }
 })
 
-// 请求拦截器 - 注入 JWT Token
 service.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
     if (token) {
+      config.headers = config.headers || {}
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -26,7 +22,6 @@ service.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// 响应拦截器 - 统一处理错误
 service.interceptors.response.use(
   (response) => {
     const res = response.data
@@ -34,6 +29,8 @@ service.interceptors.response.use(
       ElMessage.error(res.message || '请求失败')
       if (res.code === 401) {
         localStorage.removeItem('token')
+        localStorage.removeItem('username')
+        localStorage.removeItem('realName')
         router.push('/login')
       }
       return Promise.reject(new Error(res.message))
@@ -43,6 +40,8 @@ service.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      localStorage.removeItem('realName')
       router.push('/login')
       ElMessage.error('登录已过期，请重新登录')
     } else {

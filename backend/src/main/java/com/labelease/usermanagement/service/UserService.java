@@ -14,4 +14,7 @@ public interface UserService extends IService<User> {
 
     /** 根据用户名查询 */
     User getByUsername(String username);
+
+    /** 删除用户及其关联订单 */
+    boolean removeUserWithOrders(Long id);
 }

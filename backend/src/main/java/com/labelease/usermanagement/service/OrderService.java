@@ -16,4 +16,7 @@ public interface OrderService extends IService<Order> {
 
     /** 根据用户ID查询订单列表 */
     List<Order> listByUserId(Long userId);
+
+    /** 根据用户ID删除所有订单 */
+    void removeByUserId(Long userId);
 }

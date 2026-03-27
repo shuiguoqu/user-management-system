@@ -125,20 +125,35 @@ const orderStatusType = (status: number) => {
   return map[status] || 'info'
 }
 
-/** 监听 userId 变化加载数据 */
-watch(() => props.userId, async (newId) => {
-  if (newId && props.modelValue) {
-    loading.value = true
-    try {
-      const res: any = await getUserWithOrders(newId)
-      userData.value = res.data
-    } catch {
-      userData.value = null
-    } finally {
-      loading.value = false
-    }
+/** 加载用户详情数据 */
+const loadUserData = async () => {
+  if (!props.userId) {
+    userData.value = null
+    return
   }
-}, { immediate: true })
+  loading.value = true
+  try {
+    const res: any = await getUserWithOrders(props.userId)
+    userData.value = res.data
+  } catch {
+    userData.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 监听 drawer 打开和 userId 变化 */
+watch(
+  () => [props.modelValue, props.userId] as const,
+  ([visible, newId]) => {
+    if (visible && newId) {
+      loadUserData()
+    } else if (!visible) {
+      userData.value = null
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
