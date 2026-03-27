@@ -154,8 +154,16 @@ onMounted(async () => {
 
 /** 提交表单 */
 const handleSubmit = async () => {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!formRef.value) return
+  
+  try {
+    // Element Plus validate 方法会在验证失败时 reject Promise
+    await formRef.value.validate()
+  } catch (e) {
+    // 验证失败，显示错误提示
+    ElMessage.error('请检查表单填写是否正确')
+    return
+  }
 
   submitting.value = true
   try {
@@ -167,7 +175,8 @@ const handleSubmit = async () => {
       ElMessage.success('创建成功')
     }
     router.push('/users')
-  } catch {
+  } catch (err) {
+    console.error('提交失败:', err)
     // 错误已在拦截器中处理
   } finally {
     submitting.value = false

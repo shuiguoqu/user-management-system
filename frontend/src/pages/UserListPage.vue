@@ -8,15 +8,20 @@
     <!-- 搜索栏与操作按钮 -->
     <el-card class="search-card">
       <div class="toolbar">
-        <el-input
-          v-model="keyword"
-          placeholder="搜索用户名、姓名、邮箱、手机号..."
-          prefix-icon="Search"
-          clearable
-          style="width: 320px"
-          @keyup.enter="fetchUsers"
-          @clear="fetchUsers"
-        />
+        <div style="display: flex; gap: 12px; align-items: center">
+          <el-input
+            v-model="keyword"
+            placeholder="搜索用户名、姓名、邮箱、手机号..."
+            prefix-icon="Search"
+            clearable
+            style="width: 320px"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
+          />
+          <el-button type="primary" @click="handleSearch">
+            搜索
+          </el-button>
+        </div>
         <el-button
           type="primary"
           icon="Plus"
@@ -188,10 +193,15 @@ const handleDelete = async (row: any) => {
   }
 }
 
-/** 监听关键词变化，重置页码并搜索 */
-watch(keyword, () => {
+/** 搜索用户 */
+const handleSearch = () => {
   pagination.current = 1
   fetchUsers()
+}
+
+/** 监听关键词变化 */
+watch(keyword, () => {
+  // 可以在这里实现实时搜索，或者保留给搜索按钮触发
 })
 
 onMounted(() => {
